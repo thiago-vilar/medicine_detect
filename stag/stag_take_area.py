@@ -30,7 +30,7 @@ def detect_and_label_stags(image_path, library_hd=17, error_correction=None):
         height = np.max(corner[:, 1]) - np.min(corner[:, 1])
 
         # Tamanho conhecido do marcador em milímetros
-        marker_size_mm = 50  # mm
+        marker_size_mm = 20  # mm
         pixel_size_mm = width / marker_size_mm  # Conversão de pixel para mm
 
         # Calcular o centróide do marcador
@@ -42,18 +42,23 @@ def detect_and_label_stags(image_path, library_hd=17, error_correction=None):
             centroid_x, centroid_y = 0, 0
 
         # Dimensões desejadas do crop em mm convertidas para pixels
-        crop_width = int(200 * pixel_size_mm)  # 200 mm acima do centróide
-        crop_height = int(100 * pixel_size_mm)  # 100 mm para cada lado do centróide
+        crop_width = int(75 * pixel_size_mm)  
+        crop_height = int(25 * pixel_size_mm)  
+
+        # Ajuste para subir a área de crop em 30 mm
+        crop_y_adjustment = int(10 * pixel_size_mm)
 
         # Calcular a área de crop na imagem
         x_min = max(centroid_x - crop_height, 0)
         x_max = min(centroid_x + crop_height, image.shape[1])
-        y_min = max(centroid_y - crop_width, 0)
-        y_max = centroid_y  # Crop acima do centróide
+        y_min = max(centroid_y - crop_width - crop_y_adjustment, 0)  # Ajustado para subir a área de crop
+        y_max = centroid_y - crop_y_adjustment  # Ajustado para subir a área de crop
 
         # Desenhar a área de crop na imagem
-        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (255, 0, 0), 2)
-        cv2.putText(image, 'Crop Area', (x_min + 5, y_min + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 0), 2)
+
+        # Rotular o ID do marcador
+        cv2.putText(image, f'ID: {id_}', (centroid_x - (-100), centroid_y - (-20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
 
         # Desenhar o contorno do marcador
         cv2.polylines(image, [corner], True, (0, 255, 0), 2)
