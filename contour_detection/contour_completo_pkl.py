@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from rembg import remove
-import datetime
 import pickle
 import os
 
@@ -33,35 +32,13 @@ def draw_bounding_box(img, contour):
     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 5)
     return img
 
-def crop_and_draw_upper_half_contour(img, contour):
-    x, y, w, h = cv2.boundingRect(contour)
-    cropped_height = h // 2
-    cropped_img = img[y:y+cropped_height, x:x+w]
-
-    contour_points = contour[:, 0, :]
-    y_min = np.min(contour_points[:, 1])
-    y_max = np.max(contour_points[:, 1])
-    y_threshold = y_min + (y_max - y_min) / 2
-
-    upper_half_indices = np.where(contour_points[:, 1] <= y_threshold)[0]
-    upper_half_contour = contour_points[upper_half_indices]
-    contour_shifted = upper_half_contour - np.array([x, y])
-
-    # Utilizando matplotlib para desenhar os pontos sem conectar
-    fig, ax = plt.subplots()
-    ax.imshow(cropped_img)
-    ax.scatter(contour_shifted[:, 0], contour_shifted[:, 1], color='green', s=1)
-    ax.set_axis_off()
-    plt.show()
-
-    return cropped_img, contour_shifted
-
-def save_contour_signature(contour_shifted):
-    current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    filename = f'signature_contours/{current_time}.pkl'
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+def save_contour(contour):
+    # Remodela o contorno para o formato (N, 2) antes de salvar
+    reshaped_contour = contour.reshape(-1, 2)
+    filename = 'largest_contour.pkl'
     with open(filename, 'wb') as f:
-        pickle.dump(contour_shifted, f)
+        pickle.dump(reshaped_contour, f)
+    print(f"O maior contorno foi salvo em: {filename}")
 
 def main():
     filepath = input("Digite o caminho da imagem: ")
@@ -73,14 +50,15 @@ def main():
     mask = create_mask(img, lower, upper)
 
     img_with_contours, contours = find_and_draw_contours(img, mask)
-
+    
     if contours:
         largest_contour = max(contours, key=cv2.contourArea)
-        img_with_box = draw_bounding_box(img_with_contours, largest_contour)
-        cropped_img, contour_shifted = crop_and_draw_upper_half_contour(img, largest_contour)
-        save_contour_signature(contour_shifted)
-    else:
-        print("Nenhum contorno encontrado.")
+        img_with_box = draw_bounding_box(img, largest_contour)
+        save_contour(largest_contour)  # Salva o contorno após remodelá-lo
+
+    plt.imshow(img_with_box)
+    plt.title("Imagem com Caixa Delimitadora")
+    plt.show()
 
 if __name__ == "__main__":
     main()

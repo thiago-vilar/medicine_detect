@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import stag  # Certifique-se de que a biblioteca stag está corretamente importada
+import stag 
 
 def detect_and_label_stags(image_path, library_hd=17, error_correction=None):
     # Carregar a imagem
@@ -55,10 +55,10 @@ def detect_and_label_stags(image_path, library_hd=17, error_correction=None):
         y_max = centroid_y - crop_y_adjustment  # Ajustado para subir a área de crop
 
         # Desenhar a área de crop na imagem
-        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (0, 0, 0), 2)
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), (255, 255, 255), 4)
 
         # Rotular o ID do marcador
-        cv2.putText(image, f'ID: {id_}', (centroid_x - (-100), centroid_y - (-20)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
+        cv2.putText(image, f'ID: {id_}', (centroid_x - (-30), centroid_y - (-10)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
 
         # Desenhar o contorno do marcador
         cv2.polylines(image, [corner], True, (0, 255, 0), 2)
