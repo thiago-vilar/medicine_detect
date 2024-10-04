@@ -52,7 +52,7 @@ def detect_and_label_stags(image_path, library_hd=17, error_correction=None):
 
         # Calcular área de crop
         width = np.max(corner[:, 0]) - np.min(corner[:, 0])
-        pixel_size_mm = width / 20  # Tamanho conhecido do marcador em milímetros (20mm)
+        pixel_size_mm = width / 20  
         crop_width = int(60 * pixel_size_mm)
         crop_height = int(20 * pixel_size_mm)
         crop_y_adjustment = int(10 * pixel_size_mm)
