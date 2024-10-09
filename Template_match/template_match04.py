@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 # Ler a imagem original e o template
-img_original = cv2.imread('./frames/frame_20240924_110521.jpg')
+img_original = cv2.imread('./frames/frame_20240912_095308.jpg')
 template_original = cv2.imread('./med_rm/img_20241004_104055.png', cv2.IMREAD_UNCHANGED)  # Usar IMREAD_UNCHANGED para ler o canal alfa se houver
 
 # Converter a imagem original para tons de cinza e depois para BGR
