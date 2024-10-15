@@ -69,11 +69,11 @@ def main():
     img_with_contours, contours = find_and_draw_contours(img, mask)
     
     if contours:
-        save_contours(contours)  # Save all contours
+        save_contours(contours)  
 
     plt.imshow(img_with_contours)
     plt.title("Imagem com Contornos")
-    plt.axis('off')  # Remove os eixos
+    plt.axis('off')  
     plt.show()
 
 if __name__ == "__main__":
