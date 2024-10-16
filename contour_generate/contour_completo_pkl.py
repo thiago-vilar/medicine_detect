@@ -35,7 +35,7 @@ def draw_bounding_box(img, contour):
 def save_contour(contour):
     # Remodela o contorno para o formato (N, 2) antes de salvar
     reshaped_contour = contour.reshape(-1, 2)
-    filename = 'largest_contour.pkl'
+    filename = 'largest_contour_novo.pkl'
     with open(filename, 'wb') as f:
         pickle.dump(reshaped_contour, f)
     print(f"O maior contorno foi salvo em: {filename}")

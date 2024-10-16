@@ -1,27 +1,28 @@
-import numpy as np
 import cv2
+import numpy as np
 
 # Ler a imagem original e o template
-img_original = cv2.imread('./frames/frame_20240924_110521.jpg')
-template_original = cv2.imread('./med_rm/img_20241004_104055.png', cv2.IMREAD_UNCHANGED)  # Usar IMREAD_UNCHANGED para ler o canal alfa se houver
+# img_original = cv2.imread('./frames/frame_20240924_110521.jpg')
+# img_original = cv2.imread('./frames/frame_20240924_110521222222222222222222222222222222222.jpg')
+img_original = cv2.imread('./frames/frame_20240924_110521 - Copy2.jpg')
+template_original = cv2.imread('./med_rm/img_20241004_104055.png', cv2.IMREAD_UNCHANGED)  
 
-# Converter a imagem original para tons de cinza e depois para BGR
 img_gray = cv2.cvtColor(img_original, cv2.COLOR_BGR2GRAY)
 img_gray = cv2.resize(img_gray, (0, 0), fx=0.8, fy=0.8)
 img_gray_color = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
 
-# Redimensionar o template
+
 template = cv2.resize(template_original, (0, 0), fx=0.8, fy=0.8)
 h, w = template.shape[:2]
 
 # Checar se o template possui canal alfa
 if template.shape[2] == 4:
     alpha_channel = template[:, :, 3]
-    template = template[:, :, :3]  # Remover o canal alfa do template
+    template = template[:, :, :3]  
 else:
-    alpha_channel = np.ones((h, w), dtype=template.dtype) * 255  # Criar um canal alfa fictício totalmente opaco
+    alpha_channel = np.ones((h, w), dtype=template.dtype) * 255 
 
-alpha_channel = alpha_channel / 255.0  # Normalizar o canal alfa para mesclagem
+alpha_channel = alpha_channel / 255.0 
 
 # Métodos de detecção
 methods = [cv2.TM_CCOEFF_NORMED]

@@ -31,7 +31,7 @@ def display_markers(image, corners, ids):
         centroid_x = int(np.mean(corner[:, 0]))
         centroid_y = int(np.mean(corner[:, 1]))
 
-        # Desenha o contorno e o ID do marcador
+        
         cv2.polylines(image, [corner], True, (0, 255, 0), 2)
         cv2.putText(image, f'ID: {id_}', (centroid_x - (-40), centroid_y - (-10)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 1)
 
