@@ -31,12 +31,17 @@ def normalize_contour(contour):
     min_x, min_y = np.min(contour, axis=0).reshape(-1)
     return contour - [min_x, min_y]
 
+def calculate_hu_moments(contour):
+    moments = cv2.moments(contour)
+    huMoments = cv2.HuMoments(moments)
+    return np.log(np.abs(huMoments))  # Log transform to handle very small values and make scale invariant
+
 def draw_contours(img, contour):
     if contour is not None:
         return cv2.drawContours(img.copy(), [contour], -1, (0, 255, 0), 1)
     return img
 
-def get_next_filename(directory, base_name="contour"):
+def get_next_filename(directory, base_name="hu_moment"):
     files = [f for f in os.listdir(directory) if f.startswith(base_name) and f.endswith('.pkl')]
     max_number = 0
     for f in files:
@@ -45,23 +50,13 @@ def get_next_filename(directory, base_name="contour"):
             max_number = max(max_number, int(number_part))
     return os.path.join(directory, f"{base_name}{max_number + 1}.pkl")
 
-def save_contours_and_features(contour, image, directory="contours_features"):
+def save_hu_moments(huMoments, directory="hu_moments"):
     if not os.path.exists(directory):
         os.makedirs(directory)
     filename = get_next_filename(directory)
-    mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    cv2.drawContours(mask, [contour], -1, 255, -1)
-    feature_detectors = {'ORB': cv2.ORB_create(), 'SIFT': cv2.SIFT_create()}
-    feature_data = {}
-    for key, detector in feature_detectors.items():
-        keypoints, descriptors = detector.detectAndCompute(image, mask)
-        if keypoints:
-            keypoints_serializable = [(kp.pt, kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in keypoints]
-            feature_data[key] = {'keypoints': keypoints_serializable, 'descriptors': descriptors}
-    contour_data = {'contour': contour.tolist(), 'features': feature_data}
     with open(filename, 'wb') as f:
-        pickle.dump(contour_data, f)
-    print(f"Contour and features saved in {filename}")
+        pickle.dump(huMoments, f)
+    print(f"Momentos de Hu salvos em {filename}")
 
 def main():
     image_path = input("Digite o caminho da imagem: ")
@@ -76,9 +71,11 @@ def main():
         return
     contour = normalize_contour(contour)
     img_with_contours = draw_contours(image, contour)
-    save_contours_and_features(contour, image)
+    huMoments = calculate_hu_moments(contour)
+    save_hu_moments(huMoments)
+
     cv2.imwrite('contoured_and_image_output.png', img_with_contours)
-    print("Imagem com contornos salvos: contoured_image_output_epsilon.png")
+    print("Imagem com contornos e Momentos de Hu salvos: contoured_and_image_output.png")
 
 if __name__ == "__main__":
     main()
