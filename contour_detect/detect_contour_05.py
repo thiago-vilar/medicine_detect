@@ -51,7 +51,6 @@ def main():
     contour_path = input("Digite o caminho do arquivo de contorno (.csv ou .pkl): ")
 
     image = load_image(image_path)
-    image = image[:480, :480, :]
     gray_image = convert_to_grayscale(image)
     contour = load_contour(contour_path)
     result_image = draw_contour_on_grayscale_image(gray_image, contour)
