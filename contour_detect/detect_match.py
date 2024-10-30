@@ -34,6 +34,22 @@ def find_contours(gray_image):
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     return contours
 
+
+# def find_contours(gray_image):
+#     """Encontra contornos na imagem."""
+#     thresh = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)[1]
+#     contours, _ = cv2.findContours(gray_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+#     output_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2BGR)
+    
+#     cv2.drawContours(output_image, contours, -1, (0, 255, 0), 2)  
+
+#     cv2.imshow('Contornos Encontrados', output_image)
+#     cv2.waitKey(0)  
+#     cv2.destroyAllWindows()
+    
+#     return contours
+
 def match_shapes(contour1, contour2):
     """Compara dois contornos e retorna um valor de similaridade."""
     return cv2.matchShapes(contour1, contour2, cv2.CONTOURS_MATCH_I1, 0.0)
