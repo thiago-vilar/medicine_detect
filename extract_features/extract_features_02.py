@@ -190,7 +190,7 @@ class ExtractFeatures:
         print("Processamento concluído com sucesso.")
 
 if __name__ == "__main__":
-    image_path = "path_to_your_image.jpg"
-    selected_id = 1 
+    image_path = "frames\img_0_010.jpg"
+    selected_id = 0
     processor = ExtractFeatures(image_path, selected_id)
     processor.process()
