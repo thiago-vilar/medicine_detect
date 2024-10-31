@@ -8,6 +8,7 @@ import pickle
 
 class ExtractFeatures:
     def __init__(self, image_path, selected_id):
+        """Initialize with image path and ID of the STAG marker to focus on."""
         self.image_path = image_path
         self.selected_id = selected_id
         self.base_path = "features"
@@ -15,9 +16,9 @@ class ExtractFeatures:
         self.corners = None
         self.ids = None
         self.scan_areas = {}
-        self.homogenized_image = None
 
     def detect_and_label_stags(self):
+        """Load the image and detect STAG markers, storing detected corners and IDs."""
         self.image = cv2.imread(self.image_path)
         if self.image is None:
             print("Erro ao carregar a imagem.")
@@ -31,6 +32,7 @@ class ExtractFeatures:
         return True
 
     def display_markers(self):
+        """Add visual markers for detected STAGs and define scanning areas based on their locations."""
         if self.corners is None or self.ids is None:
             return False
         
@@ -60,6 +62,7 @@ class ExtractFeatures:
         return True
 
     def crop_scan_area(self):
+        """Crop the image based on the scanning area defined by the selected ID."""
         if self.selected_id not in self.scan_areas:
             print(f'ID {self.selected_id} não encontrado.')
             return None
@@ -67,6 +70,7 @@ class ExtractFeatures:
         return self.image[y_min:y_max, x_min:x_max]
 
     def remove_background(self, image_np_array):
+        """Remove the background from the cropped image, retaining only the object of interest."""
         is_success, buffer = cv2.imencode(".jpg", image_np_array)
         if not is_success:
             raise ValueError("Falha ao codificar a imagem para remoção de fundo.")
@@ -77,6 +81,7 @@ class ExtractFeatures:
         return img
 
     def create_mask(self, img):
+        """Create a binary mask for the image based on a specified color range."""
         if img.shape[2] == 4:
             img = img[:, :, :3]
         lower_bound = np.array([30, 30, 30])
@@ -84,6 +89,7 @@ class ExtractFeatures:
         return cv2.inRange(img, lower_bound, upper_bound)
 
     def extract_and_draw_contours(self, img, mask):
+        """Extract and draw contours on the image based on the provided mask."""
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         img_with_contours = img.copy()
         cv2.drawContours(img_with_contours, contours, -1, (0, 255, 0), 1)
@@ -94,6 +100,7 @@ class ExtractFeatures:
         return contours
 
     def calculate_vectors_and_return_chain_code(self, contour):
+        """Calculate and return the chain code of a contour, representing the sequence of directions in the contour."""
         directions = np.array([(1, 0), (1, -1), (0, -1), (-1, -1), 
                                (-1, 0), (-1, 1), (0, 1), (1, 1)])
         chain_code = []
@@ -108,6 +115,7 @@ class ExtractFeatures:
         return chain_code
 
     def save_features(self, image_cropped, obj_png, mask, contours_matrix, contours_chain_code):
+        """Save the extracted features in specific folders within a base folder."""
         if not os.path.exists(self.base_path):
             os.makedirs(self.base_path)
 
@@ -132,11 +140,27 @@ class ExtractFeatures:
                 pickle.dump(feature_data, file)
             print(f"Feature '{feature_name}' saved as {file_path}")
 
-    def homogenize_image_based_on_stag_orientation(self, image):
-        # This function needs actual implementation based on the orientation logic.
-        pass
+    def homogenize_image_based_on_stag_orientation(self, image, corners):
+        """Adjust the image orientation based on the orientation of the detected STAG marker."""
+        if corners is None:
+            return image
+
+        # Calculate rotation angle of the marker
+        vector = corners[0][1] - corners[0][0]  # Assumes that points 0 and 1 of the marker define the horizontal orientation
+        angle = np.arctan2(vector[1], vector[0])
+        degrees = np.degrees(angle)
+
+        # Calculate the center of rotation
+        center = tuple(np.array(image.shape[1::-1]) / 2)
+        rot_mat = cv2.getRotationMatrix2D(center, -degrees, 1.0)
+
+        # Rotate the image to normalize the orientation of the marker
+        rotated_image = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+        return rotated_image
 
     def process(self):
+        """Execute the complete image processing from detection to homogenization and feature saving."""
         if not self.detect_and_label_stags():
             return
         if not self.display_markers():
@@ -145,6 +169,11 @@ class ExtractFeatures:
         cropped_image = self.crop_scan_area()
         if cropped_image is None:
             return
+
+        # Homogenize image orientation based on the STAG marker orientation
+        if self.corners is not None and self.selected_id in self.scan_areas:
+            selected_corners = self.corners[np.where(self.ids.flatten() == self.selected_id)[0][0]]
+            cropped_image = self.homogenize_image_based_on_stag_orientation(cropped_image, selected_corners)
 
         cropped_image_with_no_bg = self.remove_background(cropped_image)
         if cropped_image_with_no_bg is None:
@@ -161,7 +190,7 @@ class ExtractFeatures:
         print("Processamento concluído com sucesso.")
 
 if __name__ == "__main__":
-    image_path = "caminho_para_sua_imagem.jpg"
-    selected_id = 1
+    image_path = "path_to_your_image.jpg"
+    selected_id = 1 
     processor = ExtractFeatures(image_path, selected_id)
     processor.process()
