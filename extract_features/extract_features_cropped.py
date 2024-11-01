@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import stag
+from rembg import remove
 
 class ExtractFeatures:
     def __init__(self, image_path, stag_id):
@@ -83,6 +84,23 @@ class ExtractFeatures:
                 return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         return self.homogenized_image[y_min:y_max, x_min:x_max]
+    
+    def remove_background(self, image_np_array):
+        is_success, buffer = cv2.imencode(".jpg", image_np_array)
+        if not is_success:
+            raise ValueError("Falha ao codificar a imagem para remoção de fundo.")
+        output_image = remove(buffer.tobytes())
+        img = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise ValueError("Falha ao decodificar a imagem processada.")
+        return img
+
+    def create_mask(self, img):
+        if img.shape[2] == 4:
+            img = img[:, :, :3]
+        lower_bound = np.array([30, 30, 30])
+        upper_bound = np.array([255, 255, 255])
+        return cv2.inRange(img, lower_bound, upper_bound)
 
 if __name__ == "__main__":
     image_path = "./frames/img_0_010.jpg"
@@ -90,11 +108,20 @@ if __name__ == "__main__":
     processor_image = ExtractFeatures(image_path, stag_id)
     if processor_image.detect_stag() and processor_image.homogenize_image_based_on_corners():
         if processor_image.display_markers():
-            cropped_area =  processor_image.crop_scan_area()
+            cropped_img =  processor_image.crop_scan_area()
+            obj_rm_bg = processor_image.remove_background(cropped_img)
+            mask = processor_image.create_mask(obj_rm_bg)
+
             plt.figure()
             plt.imshow(cv2.cvtColor(processor_image.homogenized_image, cv2.COLOR_BGR2RGB))
             plt.figure()
-            plt.imshow(cv2.cvtColor(cropped_area, cv2.COLOR_BGR2RGB))
+            plt.imshow(cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB))
+            plt.show()
+            plt.figure()
+            plt.imshow(cv2.cvtColor(obj_rm_bg, cv2.COLOR_BGR2RGB))
+            plt.show()
+            plt.figure()
+            plt.imshow(cv2.cvtColor(mask, cv2.COLOR_BGR2RGB))
             plt.show()
         else:
             print("Failed to display markers.")
