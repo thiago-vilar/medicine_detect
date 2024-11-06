@@ -5,6 +5,37 @@ import stag
 from rembg import remove
 
 class ExtractFeatures:
+    
+    '''Estratégia de execução class ExtractFeatures: 
+        1 - Carrega a imagem e reconhecer a stag passada como parâmetro na chamada da classe; 
+          no método "def detect_stag(self)" medir o stag e retornar id, corners e medidas das arestas em milímetros;
+        2 - Normalizar a imagem com base nas stags com uso da função "def homogenize_image_based_on_corners(self)"
+          executar correção de posicionamento de stag(eixos coordenados) e executando homogeneização da imagem, warped se necessário
+          salvar a imagem_homogeneized+nºcrescente na pasta img_homogeneized através da função "def save_features_separated (self)";
+        3 - Com base na medida da stag, executar a função "def display_scan_areas_by_markers(self)" para achar a scan_area referen
+          te a área de atuação do processamento de imagem;
+          salvar a scan_area+nºcrescente na pasta scan_areas através da função "def save_features_separated (self)";
+        4 - Criar a máscara do objeto com uso de threshold para isolar o medicamento corretamente usando a função "def create_mask(self, img)
+          salvar a mask+nºcrescente na pasta medicine_mask através da função "def save_features_separated (self)";"
+        5 - Mapear o contorno a partir da máscara com a função "def find_and_draw_contours(self, homogeneized_img, mask)"
+          salvar a contour+nºcrescente na pasta contorno através da função "def save_features_separated (self)";
+        6 - Pegar o contorno salvo e transforma-lo em vetores do tipo chain_code, livre informações de localização matriz da imagem
+          com uso da função "def create_chain_code(self)"; salvar a chain_code+nºcrescente na pasta contorno_chain_code através da função 
+        "def save_features_separated (self)";
+        7 - Medir o tamanho do medicamento em suas dimensões (altura x largura) com base na imagem homogeneizada, medidas extraídas
+          do stag(20mm), contorno e plotar as medidas no meio da imagem; salvar a measures+nºcrescente na pasta measures através da função
+          "def save_features_separated (self)";    
+        8 - cropar scan_area com uso da função "def crop_scan_area(self)";
+          salvar cropped_area+nºcrescente na pasta cropped através da função "def save_features_separated (self)";"
+        9 - remover background da cropped_area com uso da função  " def remove_background(self, image_np_array)";
+          extrair o png e salva-lo como medicine_png+nºcrescente na pasta template através da função "def save_features_separated (self)";
+        10 - extrai 1 histograma colorido e 1 em escala de cinza com uso da função def histogram_by_template();
+          salva na forma hist_color+nºcrescente e hist_gray+nºcrescente na pasta histogram através da função "def save_features_separated (self)";
+        11 - extrai a textura do medicamento com base na análise dos histogramas do medicamento em png para criar ambiente com diferentes texturas usando a função def texture_define();
+          salva na forma texture_color+nºcrescente e texture_gray+nºcrescente na pasta texture através da função "def save_features_separated (self)";               
+          '''
+    
+    
     def __init__(self, image_path, stag_id):
         self.image_path = image_path
         self.stag_id = stag_id
