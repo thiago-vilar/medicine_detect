@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
+from scipy.signal import find_peaks
+from skimage.filters import threshold_multiotsu
 import stag
 from rembg import remove
-
 class ExtractFeatures:
     
     '''Estratégia de execução class ExtractFeatures: 
@@ -39,7 +40,9 @@ class ExtractFeatures:
     def __init__(self, image_path, stag_id):
         self.image_path = image_path
         self.stag_id = stag_id
-        self.image = None
+        self.image = cv2.imread(self.image_path)
+        if self.image is None:
+            raise ValueError("Image could not be loaded.")
         self.corners = None
         self.ids = None
         self.homogenized_image = None
@@ -61,8 +64,7 @@ class ExtractFeatures:
 
     def homogenize_image_based_on_corners(self):
         if self.corners is None:
-            print("Corners not detected.")
-            return False
+            return None  # Retorna None se não há cantos detectados
         x, y, w, h = cv2.boundingRect(self.corners.astype(np.float32))
         aligned_corners = np.array([
             [x, y],
@@ -70,12 +72,9 @@ class ExtractFeatures:
             [x + w, y + h],
             [x, y + h]
         ], dtype='float32')
-
         transform_matrix = cv2.getPerspectiveTransform(self.corners, aligned_corners)
-        max_width = self.image.shape[1]
-        max_height = self.image.shape[0]
-        self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (max_width, max_height))
-        return True
+        self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (self.image.shape[1], self.image.shape[0]))
+        return self.homogenized_image 
 
     def display_scan_area_by_markers(self):
         if self.homogenized_image is None:
@@ -105,33 +104,36 @@ class ExtractFeatures:
 
         cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
         cv2.putText(self.homogenized_image, 'Scan Area', (x_min, y_min-5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 1)
-        self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
+        scan_area = (x_min, x_max, y_min, y_max)
+        self.scan_areas[self.stag_id] = scan_area
+        return scan_area 
 
-        return True
     
     def crop_scan_area(self):
         if self.stag_id not in self.scan_areas:
                 print(f'ID {self.stag_id} não encontrado.')
                 return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
-        return self.homogenized_image[y_min:y_max, x_min:x_max]
+        cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
+        return cropped_image 
     
     def remove_background(self, image_np_array):
         is_success, buffer = cv2.imencode(".jpg", image_np_array)
         if not is_success:
             raise ValueError("Falha ao codificar a imagem para remoção de fundo.")
         output_image = remove(buffer.tobytes())
-        img = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
-        if img is None:
+        img_med = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
+        if img_med is None:
             raise ValueError("Falha ao decodificar a imagem processada.")
-        return img
+        return img_med
 
     def create_mask(self, img):
         if img.shape[2] == 4:
             img = img[:, :, :3]
         lower_bound = np.array([30, 30, 30])
         upper_bound = np.array([255, 255, 255])
-        return cv2.inRange(img, lower_bound, upper_bound)
+        mask = cv2.inRange(img, lower_bound, upper_bound)
+        return mask
     
     def find_and_draw_contours(self, img, mask):
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -159,7 +161,7 @@ class ExtractFeatures:
             dx = next_point[0] - current_point[0]
             dy = next_point[1] - current_point[1]
 
-            # Normalize the direction to the nearest cardinal point
+            # Normalize cardinal
             if dx != 0:
                 dx = dx // abs(dx)
             if dy != 0:
@@ -170,7 +172,6 @@ class ExtractFeatures:
                 chain_code.append(moves[move])
             current_point = next_point
 
-        # Close the loop
         dx = start_point[0] - current_point[0]
         dy = start_point[1] - current_point[1]
         if dx != 0:
@@ -181,14 +182,12 @@ class ExtractFeatures:
         if move in moves:
             chain_code.append(moves[move])
 
-        return chain_code
-    
+        return chain_code, len(chain_code)
+
     def draw_chain_code(self, img, contour, chain_code):
-        # Define the starting point
         start_point = tuple(contour[0][0])
         current_point = start_point
-        
-        # Moves correspond to chain code directions
+
         moves = {
             0: (1, 1),    # bottom-right
             1: (0, 1),    # right
@@ -199,75 +198,97 @@ class ExtractFeatures:
             6: (1, -1),   # bottom-left
             7: (1, 0)     # bottom
         }
-
-        # Draw each segment based on the chain code
         for code in chain_code:
             dx, dy = moves[code]
             next_point = (current_point[0] + dx, current_point[1] + dy)
-            cv2.line(img, current_point, next_point, (255, 255, 255), 1)  # Draw white line
+            cv2.line(img, current_point, next_point, (255, 255, 255), 1) 
             current_point = next_point
-        
-        return img
-
-
-
+        return img, len(chain_code)
 
     def medicine_measures(self, img, contours):
         if not contours:
-            print("No contours found.")
             return None
-
-        stag_width_px = np.max(self.corners[:, 0]) - np.min(self.corners[:, 0])
-        px_to_mm_scale = 20 / stag_width_px
-
+        measurements = []
         for contour in contours:
             x, y, w, h = cv2.boundingRect(contour)
-            width_mm = w * px_to_mm_scale
-            height_mm = h * px_to_mm_scale
+            measurements.append((w, h))
+        return measurements 
 
-            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 1)
-            cv2.putText(img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    # def histogram_medicine ():
 
-        return img
+    #     # Calculo do histograma
+    #     histogram = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
+
+    #     # Normaliza o histograma para uma escala de 0 a 1
+    #     hist_norm = histogram / max(histogram)
+
+    #     # Define parâmetros para detecção de picos
+    #     height_threshold = 0.5
+    #     distance = 10
+
+    #     # Função find_peaks da biblioteca scipy
+    #     peaks, _ = find_peaks(hist_norm, height=height_threshold, distance=distance)
+    #     number_of_peaks = len(peaks)
+
+    #     plt.plot(hist_norm)
+    #     plt.plot(peaks, hist_norm[peaks], "x")
+    #     plt.title('Histograma com Principais Picos Detectados')
+    #     plt.show()
+
+    #     print(f"Posições dos principais picos no histograma: {peaks}")
+    #     print(f"Altura dos principais picos: {hist_norm[peaks]}")
+    #     print(f"Quantidade de picos principais detectados: {number_of_peaks}")
+
+
+
+    # def otsu_multlimar_analisys(self, image, number_of_peaks):
+        
+    #     thresholds = threshold_multiotsu(image, classes=number_of_peaks)
+    #     regions = np.digitize(image, bins=thresholds)
+    #     plt.figure(figsize=(8, 6))
+    #     plt.imshow(regions, cmap='nipy_spectral')
+    #     plt.colorbar()
+    #     plt.title(f'Segmentação Otsu Multilimiar com {number_of_peaks} Texturas')
+    #     plt.show()
 
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\thiago_fotos_10_features_morning\\img_1_010.jpg"
-    stag_id = 1
-    processor_image = ExtractFeatures(image_path, stag_id)
-    if processor_image.detect_stag() and processor_image.homogenize_image_based_on_corners():
-        if processor_image.display_scan_area_by_markers():
-            cropped_img = processor_image.crop_scan_area()
-            obj_rm_bg = processor_image.remove_background(cropped_img)
-            mask = processor_image.create_mask(obj_rm_bg)
-            desenho, contours = processor_image.find_and_draw_contours(obj_rm_bg, mask)
-            medicine_measures = processor_image.medicine_measures(desenho, contours)
-            if contours:
-                for contour in contours:
-                    chain_code = processor_image.compute_chain_code(contour)  # individual contour
-                    draw_chain_code = processor_image.draw_chain_code(desenho, contour, chain_code)
-                    print("Chain Code:", chain_code)
-            plt.figure()
-            plt.imshow(cv2.cvtColor(processor_image.homogenized_image, cv2.COLOR_BGR2RGB))
-            plt.figure()
-            plt.imshow(cv2.cvtColor(cropped_img, cv2.COLOR_BGR2RGB))
+    image_path = ".\\frames\\img_0_010.jpg"
+    stag_id = 0
+    processor = ExtractFeatures(image_path, stag_id)
+    if processor.detect_stag():
+        homogenized = processor.homogenize_image_based_on_corners()
+        if homogenized is not None:
+            plt.imshow(cv2.cvtColor(homogenized, cv2.COLOR_BGR2RGB))
+            plt.title('Homogenized Image')
             plt.show()
-            plt.figure()
-            plt.imshow(cv2.cvtColor(obj_rm_bg, cv2.COLOR_BGR2RGB))
-            plt.show()
-            plt.figure()
-            plt.imshow(cv2.cvtColor(mask, cv2.COLOR_BGR2RGB))
-            plt.show()
-            plt.figure()
-            plt.imshow(cv2.cvtColor(desenho, cv2.COLOR_BGR2RGB))
-            plt.show()
-            plt.figure()
-            plt.imshow(cv2.cvtColor(draw_chain_code, cv2.COLOR_BGR2RGB))
-            plt.show()
-            plt.figure()
-            plt.imshow(cv2.cvtColor(medicine_measures, cv2.COLOR_BGR2RGB))
-            plt.show()
-        else:
-            print("Failed to display markers.")
+
+            marked_image = processor.display_scan_area_by_markers()
+            if marked_image is not None:
+                plt.imshow(cv2.cvtColor(marked_image, cv2.COLOR_BGR2RGB))
+                plt.title('Marked Scan Area')
+                plt.show()
+
+                cropped = processor.crop_scan_area()
+                if cropped is not None:
+                    plt.imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+                    plt.title('Cropped Scan Area')
+                    plt.show()
+
+                    background_removed = processor.remove_background(cropped)
+                    if background_removed is not None:
+                        plt.imshow(cv2.cvtColor(background_removed, cv2.COLOR_BGR2RGB))
+                        plt.title('Background Removed')
+                        plt.show()
+
+                        mask = processor.create_mask(background_removed)
+                        plt.imshow(mask, cmap='gray')
+                        plt.title('Mask Created')
+                        plt.show()
+
+                        contoured_image = processor.find_and_draw_contours(background_removed, mask)
+                        plt.imshow(cv2.cvtColor(contoured_image, cv2.COLOR_BGR2RGB))
+                        plt.title('Contoured Image')
+                        plt.show()
     else:
-        print("Failed to process image.")
+        print("Stag detection failed.")

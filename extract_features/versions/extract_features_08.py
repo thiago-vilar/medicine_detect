@@ -1,10 +1,9 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-from scipy.signal import find_peaks
-from skimage.filters import threshold_multiotsu
+import matplotlib.pyplot as plt
 import stag
 from rembg import remove
+
 class ExtractFeatures:
     
     '''Estratégia de execução class ExtractFeatures: 
@@ -143,7 +142,7 @@ class ExtractFeatures:
         start_point = contour[0][0]
         current_point = start_point
         chain_code = []
-        
+
         moves = {
             (-1, 0) : 3,  # Move to left
             (-1, 1) : 2,  # Move to top-right
@@ -211,6 +210,8 @@ class ExtractFeatures:
         return img
 
 
+
+
     def medicine_measures(self, img, contours):
         if not contours:
             print("No contours found.")
@@ -229,46 +230,9 @@ class ExtractFeatures:
 
         return img
 
-    def histogram_medicine ():
-
-        # Calculo do histograma
-        histogram = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
-
-        # Normaliza o histograma para uma escala de 0 a 1
-        hist_norm = histogram / max(histogram)
-
-        # Define parâmetros para detecção de picos
-        height_threshold = 0.5
-        distance = 10
-
-        # Função find_peaks da biblioteca scipy
-        peaks, _ = find_peaks(hist_norm, height=height_threshold, distance=distance)
-        number_of_peaks = len(peaks)
-
-        plt.plot(hist_norm)
-        plt.plot(peaks, hist_norm[peaks], "x")
-        plt.title('Histograma com Principais Picos Detectados')
-        plt.show()
-
-        print(f"Posições dos principais picos no histograma: {peaks}")
-        print(f"Altura dos principais picos: {hist_norm[peaks]}")
-        print(f"Quantidade de picos principais detectados: {number_of_peaks}")
-
-
-
-    def otsu_multlimar_analisys(self, image, number_of_peaks):
-        
-        thresholds = threshold_multiotsu(image, classes=number_of_peaks)
-        regions = np.digitize(image, bins=thresholds)
-        plt.figure(figsize=(8, 6))
-        plt.imshow(regions, cmap='nipy_spectral')
-        plt.colorbar()
-        plt.title(f'Segmentação Otsu Multilimiar com {number_of_peaks} Texturas')
-        plt.show()
-
 
 if __name__ == "__main__":
-    image_path = "./frames/img_0_010.jpg"
+    image_path = ".\\frames\\img_0_010.jpg"
     stag_id = 0
     processor_image = ExtractFeatures(image_path, stag_id)
     if processor_image.detect_stag() and processor_image.homogenize_image_based_on_corners():
