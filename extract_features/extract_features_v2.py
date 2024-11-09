@@ -119,6 +119,32 @@ class ExtractFeatures:
         # print(f'Image saved as medicine_{file_number}.png with transparent background')
         return img_med
 
+    def calculate_histograms(self, img_med):
+        "Calculates and returns RGB color histograms of an image, excluding any transparent pixels defined by the alpha channel."
+        histograms = {}
+        if img_med.shape[2] == 4: 
+            alpha_mask = img_med[:, :, 3] > 10  
+            img_bgr = img_med[alpha_mask, :3]  
+            img_rgb = cv2.cvtColor(img_bgr.reshape(-1, 1, 3), cv2.COLOR_BGR2RGB)
+
+            colors = ('r', 'g', 'b')
+            for i, color in enumerate(colors):
+                hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
+                histograms[color] = hist.flatten()  
+            # # Save
+            # directory = 'features/histogram'
+            # if not os.path.exists(directory):
+            #     os.makedirs(directory)
+            # file_number = 0
+            # file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
+            # while os.path.exists(file_path):
+            #     file_number += 1
+            #     file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
+            # with open(file_path, 'wb') as file:
+            #     pickle.dump(histograms, file)
+            # print(f"Histograms saved to {file_path}")
+        return histograms
+
     def create_mask(self, img):
         """Creates a binary mask for the foreground object in the image and saves it with transparency."""
         if img.shape[2] == 4:
@@ -249,8 +275,8 @@ class ExtractFeatures:
             x, y, w, h = cv2.boundingRect(point)
             width_mm = w * px_to_mm_scale
             height_mm = h * px_to_mm_scale
-            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 255, 0), 1)
-            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 0, 255), 1)
+            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
 
         # # Save
         # directory = 'features/medicine_measures'
@@ -267,8 +293,8 @@ class ExtractFeatures:
         return measured_img
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\IMG-20241107-WA0031.jpg"
-    stag_id = 3
+    image_path = ".\\frames\\img_0_010.jpg"
+    stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
@@ -313,10 +339,26 @@ if __name__ == "__main__":
                             plt.title('Chain Code Drawn')
                             plt.show()
 
-                            measured_medicine = processor.medicine_measures(cropped, [largest_contour])
+                            measured_medicine = processor.medicine_measures(img_med, [largest_contour])
                             plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
                             plt.title('Measured Medicine')
                             plt.show()
+
+                            histograms = processor.calculate_histograms(img_med)
+                    
+                            # Plot dos histogramas RGB
+                            plt.figure(figsize=(10, 5))
+                            plt.title('Histograma RGB')
+                            plt.xlabel('Intensidade do Pixel')
+                            plt.ylabel('Quantidade de Pixels')
+                            colors = ['r', 'g', 'b']
+                            for i, color in enumerate(colors):
+                                plt.plot(histograms[color], color=color, label=f'{color.upper()}')
+                            plt.xlim([0, 256])
+                            plt.legend()
+                            plt.grid(True)
+                            plt.show()
     else:
         print("Stag detection failed.")
+
 
