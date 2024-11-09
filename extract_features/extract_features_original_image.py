@@ -55,17 +55,16 @@ class ExtractFeatures:
         self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (self.image.shape[1], self.image.shape[0]))
         return self.homogenized_image
 
-    ''' Displays the scan area on the homogenized image based on the stag location. '''
     def display_scan_area_by_markers(self):
-        if self.homogenized_image is None:
-            print("Homogenized image is not available.")
+        if self.image is None:
+            print("Image is not available.")
             return None
         
         corner = self.corners.reshape(-1, 2).astype(int)
         centroid_x = int(np.mean(corner[:, 0]))
         centroid_y = int(np.mean(corner[:, 1]))
 
-        cv2.putText(self.homogenized_image, f'ID:{self.stag_id}', (centroid_x + 45, centroid_y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 1)
+        cv2.putText(self.image, f'ID:{self.stag_id}', (centroid_x + 45, centroid_y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 1)
 
         width = np.max(corner[:, 0]) - np.min(corner[:, 0])
         pixel_size_mm = width / 20
@@ -74,13 +73,14 @@ class ExtractFeatures:
         crop_y_adjustment = int(10 * pixel_size_mm)
 
         x_min = max(centroid_x - crop_width, 0)
-        x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
+        x_max = min(centroid_x + crop_width, self.image.shape[1])
         y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
         y_max = max(centroid_y - crop_y_adjustment, 0)
 
-        cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+        cv2.rectangle(self.image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
         self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
-        return self.homogenized_image
+        return self.image
+
 
     def crop_scan_area(self):
         """Crops the defined scan area from the homogenized image and saves it locally."""
@@ -88,7 +88,7 @@ class ExtractFeatures:
             print(f'ID {self.stag_id} not found.')
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
-        cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
+        cropped_image = self.image[y_min:y_max, x_min:x_max]
         # #Save
         # if not os.path.exists('features/cropped_imgs'):
         #     os.makedirs('features/cropped_imgs')
@@ -271,10 +271,17 @@ if __name__ == "__main__":
     stag_id = 3
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
-        homogenized = processor.homogenize_image_based_on_corners()
-        if homogenized is not None:
-            plt.imshow(cv2.cvtColor(homogenized, cv2.COLOR_BGR2RGB))
-            plt.title('Homogenized Image')
+        '''Este hack roda o programa principal sem o método homogenized para testar a aplicação'''
+
+        # homogenized = processor.homogenize_image_based_on_corners()
+        # if homogenized is not None:
+        #     plt.imshow(cv2.cvtColor(homogenized, cv2.COLOR_BGR2RGB))
+        #     plt.title('Homogenized Image')
+        #     plt.show()
+        original_image = cv2.imread(image_path)
+        if original_image is not None:
+            plt.imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+            plt.title('Original Image')
             plt.show()
 
             marked_image = processor.display_scan_area_by_markers()
@@ -304,10 +311,10 @@ if __name__ == "__main__":
                         contoured_image, largest_contour = processor.find_and_draw_contours(mask)
                         if contoured_image is not None and largest_contour is not None and largest_contour.size > 0:
                             plt.imshow(cv2.cvtColor(contoured_image, cv2.COLOR_BGR2RGB))
-                            plt.title('Largest Contour by Mask')
+                            plt.title('Contoured Mask')
                             plt.show()
 
-                            chain_code, _ = processor.compute_chain_code(largest_contour)  
+                            chain_code, _ = processor.compute_chain_code(largest_contour)  # Calcula o chain_code
                             chain_drawn_image, _ = processor.draw_chain_code(img_med, largest_contour, chain_code)
                             plt.imshow(cv2.cvtColor(chain_drawn_image, cv2.COLOR_BGR2RGB))
                             plt.title('Chain Code Drawn')
