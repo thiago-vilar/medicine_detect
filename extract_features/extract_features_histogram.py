@@ -98,23 +98,23 @@ class ExtractFeatures:
         if img_med is None:
             raise ValueError("Failed to decode processed image.")
         return img_med
+    
+    def extract_png(self, img_med):
+        if img_med.shape[2] == 4:  
+            img_bgr = cv2.cvtColor(img_med, cv2.COLOR_BGRA2BGR)
+        else:
+            img_bgr = img_med
+        return img_bgr
 
-    def histogram_view(self, img_med):
-        # Split image into RGB channels
-        chans = cv2.split(img_med)
+    def histogram_view(self, img_med_png):
+        chans = cv2.split(img_med_png)
         colors = ("r", "g", "b")
-        plt.figure()
+        histograms = {}
         for chan, color in zip(chans, colors):
             hist = cv2.calcHist([chan], [0], None, [256], [0, 256])
-            hist = hist / hist.sum()  # Normalize histogram
-            plt.plot(hist, color=color)
-            plt.title(f"{color.capitalize()} Histogram (Normalized)")
-            plt.xlabel("Bins")
-            plt.ylabel("% of Pixels")
-            plt.xlim([0, 256])
-        plt.show()
-
-    # Add other methods as previously defined...
+            histograms[color] = hist / hist.sum()  
+        return histograms
+    
 
 if __name__ == "__main__":
     image_path = ".\\frames\\IMG-20241107-WA0031.jpg"
@@ -143,12 +143,22 @@ if __name__ == "__main__":
                     if background_removed is not None:
                         plt.imshow(cv2.cvtColor(background_removed, cv2.COLOR_BGR2RGB))
                         plt.title('Background Removed')
-                        histogram_go = processor.histogram_view(background_removed)
-                        if histogram_go is not None:
-                            plt.imshow(cv2.cvtColor(histogram_go, cv2.COLOR_BGR2RGB))
-                            plt.title('Histogram Go')
-                            plt.show()
-
+                        img_png = processor.extract_png(background_removed)
+                        if img_png is not None:  
+                            img_png = processor.extract_png(background_removed)
+                            histograms = processor.histogram_view(img_png)
+                            plt.figure()
+                            for color, hist in histograms.items():
+                                plt.plot(hist, label=f'{color} channel', color=color)
+                                plt.title("Color Histogram (Normalized)")
+                                plt.xlabel("Bins")
+                                plt.ylabel("% of Pixels")
+                                plt.xlim([0, 256])
+                                plt.legend()
+                                plt.show()
+                                plt.imshow(cv2.cvtColor(img_png, cv2.COLOR_BGR2RGB))
+                                plt.title('Processed Image without Alpha Channel')
+                                plt.show()
     else:
         print("Stag detection failed.")
 
