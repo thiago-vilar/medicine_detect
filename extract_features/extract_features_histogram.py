@@ -1,8 +1,11 @@
+import os
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import stag
 from rembg import remove
+import pickle
+
 
 class ExtractFeatures:
     ''' Initializes with the path to an image and a specific marker (stag) ID. '''
@@ -79,17 +82,26 @@ class ExtractFeatures:
         self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
         return self.homogenized_image
 
-    ''' Crops the defined scan area from the homogenized image. '''
     def crop_scan_area(self):
+        """Crops the defined scan area from the homogenized image and saves it locally."""
         if self.stag_id not in self.scan_areas:
             print(f'ID {self.stag_id} not found.')
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
+        # #Save
+        # if not os.path.exists('features/cropped_imgs'):
+        #     os.makedirs('features/cropped_imgs')
+        # file_number = 0
+        # while os.path.exists(f'features/cropped/img_cropped_{file_number}.jpg'):
+        #     file_number += 1
+        # cv2.imwrite(f'features/cropped/img_cropped_{file_number}.jpg', cropped_image)
+        # print(f'Image saved as img_cropped_{file_number}.jpg')
         return cropped_image
 
-    ''' Removes the background from the cropped scan area using the rembg library. '''
+
     def remove_background(self, image_np_array):
+        """Removes the background from the cropped scan area and saves the image with alpha channel."""
         is_success, buffer = cv2.imencode(".jpg", image_np_array)
         if not is_success:
             raise ValueError("Failed to encode image for background removal.")
@@ -97,28 +109,192 @@ class ExtractFeatures:
         img_med = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
         if img_med is None:
             raise ValueError("Failed to decode processed image.")
+        # # Save
+        # if not os.path.exists('features/medicine_png'):
+        #     os.makedirs('features/medicine_png')
+        # file_number = 0
+        # while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
+        #     file_number += 1
+        # cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
+        # print(f'Image saved as medicine_{file_number}.png with transparent background')
         return img_med
-    
-    def extract_png(self, img_med):
-        if img_med.shape[2] == 4:  
-            img_bgr = cv2.cvtColor(img_med, cv2.COLOR_BGRA2BGR)
-        else:
-            img_bgr = img_med
-        return img_bgr
 
-    def histogram_view(self, img_med_png):
-        chans = cv2.split(img_med_png)
-        colors = ("r", "g", "b")
+    def calculate_histograms(self, img_med):
+        "Calculates and returns RGB color histograms of an image, excluding any transparent pixels defined by the alpha channel."
         histograms = {}
-        for chan, color in zip(chans, colors):
-            hist = cv2.calcHist([chan], [0], None, [256], [0, 256])
-            histograms[color] = hist / hist.sum()  
+        if img_med.shape[2] == 4: 
+            alpha_mask = img_med[:, :, 3] > 10  
+            img_bgr = img_med[alpha_mask, :3]  
+            img_rgb = cv2.cvtColor(img_bgr.reshape(-1, 1, 3), cv2.COLOR_BGR2RGB)
+
+            colors = ('r', 'g', 'b')
+            for i, color in enumerate(colors):
+                hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
+                histograms[color] = hist.flatten()  
+            # # Save
+            # directory = 'features/histogram'
+            # if not os.path.exists(directory):
+            #     os.makedirs(directory)
+            # file_number = 0
+            # file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
+            # while os.path.exists(file_path):
+            #     file_number += 1
+            #     file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
+            # with open(file_path, 'wb') as file:
+            #     pickle.dump(histograms, file)
+            # print(f"Histograms saved to {file_path}")
         return histograms
+
+    def create_mask(self, img):
+        """Creates a binary mask for the foreground object in the image and saves it with transparency."""
+        if img.shape[2] == 4:
+            img = img[:, :, :3]  # Remove alpha channel
+        lower_bound = np.array([30, 30, 30])
+        upper_bound = np.array([255, 255, 255])
+        mask = cv2.inRange(img, lower_bound, upper_bound)
+        # Convert binary mask to 4-channel 
+        mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
+        mask_rgba[:, :, 3] = mask  # Set alpha channel to mask
+        # # Save
+        # directory = 'features/mask'
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        # file_number = 0
+        # while os.path.exists(f'{directory}/mask_{file_number}.png'):
+        #     file_number += 1
+        # cv2.imwrite(f'{directory}/mask_{file_number}.png', mask_rgba)
+        # print(f'Mask saved as mask_{file_number}.png with transparency in {directory}')
+        return mask
     
+    def find_and_draw_contours(self, mask):
+        """Finds and draws only the largest contour around the foreground object based on the mask and saves the image with alpha transparency."""
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        if len(contours) > 0:
+            largest_contour = max(contours, key=cv2.contourArea)
+            if largest_contour.size > 0:
+                mask_with_contours = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
+                mask_with_contours[:, :, 3] = mask  
+                cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)  
+                # #Save             
+                # directory = 'features/contour'
+                # if not os.path.exists(directory):
+                #     os.makedirs(directory)
+                # file_number = 0
+                # while os.path.exists(f'{directory}/contour_{file_number}.png'):
+                #     file_number += 1
+                # cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
+                # print(f'Contour image saved as contour_{file_number}.png in {directory}')
+                return mask_with_contours, largest_contour
+        else:
+            return None
+
+    def compute_chain_code(self, contour):
+        ''' Calculates chain code for object contours for shape analysis. '''
+        start_point = contour[0][0]
+        current_point = start_point
+        chain_code = []
+        moves = {
+            (-1, 0) : 3,
+            (-1, 1) : 2,
+            (0, 1)  : 1,
+            (1, 1)  : 0,
+            (1, 0)  : 7,
+            (1, -1) : 6,
+            (0, -1) : 5,
+            (-1, -1): 4
+        }
+        for i in range(1, len(contour)):
+            next_point = contour[i][0]
+            dx = next_point[0] - current_point[0]
+            dy = next_point[1] - current_point[1]
+            if dx != 0:
+                dx = dx // abs(dx)
+            if dy != 0:
+                dy = dy // abs(dy)
+            move = (dx, dy)
+            if move in moves:
+                chain_code.append(moves[move])
+            current_point = next_point
+        # Close the loop
+        dx = start_point[0] - current_point[0]
+        dy = start_point[1] - current_point[1]
+        if dx != 0:
+            dx = dx // abs(dx)
+        if dy != 0:
+            dy = dy // abs(dy)
+        move = (dx, dy)
+        if move in moves:
+            chain_code.append(moves[move])
+        # # Save
+        # directory = 'features/signature'
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        # file_number = 0
+        # file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        # while os.path.exists(file_path):
+        #     file_number += 1
+        #     file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        
+        # with open(file_path, 'wb') as file:
+        #     pickle.dump(chain_code, file)
+        # print(f"Chain code saved to {file_path}")
+        # print("Chain code sequence:", chain_code)
+
+        return chain_code, len(chain_code)
+
+    def draw_chain_code(self, img_med, contour, chain_code):
+        ''' Draws the chain code on the image to visually represent contour direction changes. '''
+        start_point = tuple(contour[0][0])
+        current_point = start_point
+        moves = {
+            0: (1, 1),    # bottom-right
+            1: (0, 1),    # right
+            2: (-1, 1),   # top-right
+            3: (-1, 0),   # left
+            4: (-1, -1),  # top-left
+            5: (0, -1),   # left
+            6: (1, -1),   # bottom-left
+            7: (1, 0)     # bottom
+        }
+        for code in chain_code:
+            dx, dy = moves[code]
+            next_point = (current_point[0] + dx, current_point[1] + dy)
+            cv2.line(img_med, current_point, next_point, (255, 255, 255), 1)
+            current_point = next_point
+        return img_med, len(chain_code)
+
+    def medicine_measures(self, cropped_img, largest_contour):
+        ''' Measures the dimensions of the detected contours and appends to a list. '''
+        if not largest_contour:
+            print("No contours found.")
+            return None
+        stag_width_px = np.max(self.corners[:, 0]) - np.min(self.corners[:, 0])
+        px_to_mm_scale = 20 / stag_width_px
+        measured_img = cropped_img.copy()
+        for point in largest_contour:
+            x, y, w, h = cv2.boundingRect(point)
+            width_mm = w * px_to_mm_scale
+            height_mm = h * px_to_mm_scale
+            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 255, 0), 1)
+            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+
+        # # Save
+        # directory = 'features/medicine_measures'
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        # file_number = 0
+        # file_path = os.path.join(directory, f'med_measure_{file_number}.png')
+        # while os.path.exists(file_path):
+        #     file_number += 1
+        #     file_path = os.path.join(directory, f'med_measure_{file_number}.png')
+        # cv2.imwrite(file_path, measured_img)
+        # print(f"Image saved as {file_path}")
+
+        return measured_img
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\IMG-20241107-WA0031.jpg"
-    stag_id = 3
+    image_path = ".\\frames\\new_pictures\\thiago_fotos_10_beje_ampola02_cima\\img_10_007.jpg"
+    stag_id = 10
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
@@ -141,24 +317,46 @@ if __name__ == "__main__":
 
                     background_removed = processor.remove_background(cropped)
                     if background_removed is not None:
-                        plt.imshow(cv2.cvtColor(background_removed, cv2.COLOR_BGR2RGB))
+                        img_med = background_removed.copy()
+                        plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
                         plt.title('Background Removed')
-                        img_png = processor.extract_png(background_removed)
-                        if img_png is not None:  
-                            img_png = processor.extract_png(background_removed)
-                            histograms = processor.histogram_view(img_png)
-                            plt.figure()
-                            for color, hist in histograms.items():
-                                plt.plot(hist, label=f'{color} channel', color=color)
-                                plt.title("Color Histogram (Normalized)")
-                                plt.xlabel("Bins")
-                                plt.ylabel("% of Pixels")
-                                plt.xlim([0, 256])
-                                plt.legend()
-                                plt.show()
-                                plt.imshow(cv2.cvtColor(img_png, cv2.COLOR_BGR2RGB))
-                                plt.title('Processed Image without Alpha Channel')
-                                plt.show()
+                        plt.show()
+
+                        mask = processor.create_mask(background_removed)
+                        plt.imshow(mask, cmap='gray')
+                        plt.title('Mask')
+                        plt.show()
+
+                        contoured_image, largest_contour = processor.find_and_draw_contours(mask)
+                        if contoured_image is not None and largest_contour is not None and largest_contour.size > 0:
+                            plt.imshow(cv2.cvtColor(contoured_image, cv2.COLOR_BGR2RGB))
+                            plt.title('Largest Contour by Mask')
+                            plt.show()
+
+                            chain_code, _ = processor.compute_chain_code(largest_contour)  
+                            chain_drawn_image, _ = processor.draw_chain_code(img_med, largest_contour, chain_code)
+                            plt.imshow(cv2.cvtColor(chain_drawn_image, cv2.COLOR_BGR2RGB))
+                            plt.title('Chain Code Drawn')
+                            plt.show()
+
+                            measured_medicine = processor.medicine_measures(img_med, [largest_contour])
+                            plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
+                            plt.title('Measured Medicine')
+                            plt.show()
+
+                            histograms = processor.calculate_histograms(img_med)
+                    
+                            # Plot dos histogramas RGB
+                            plt.figure(figsize=(10, 5))
+                            plt.title('Histograma RGB')
+                            plt.xlabel('Intensidade do Pixel')
+                            plt.ylabel('Quantidade de Pixels')
+                            colors = ['r', 'g', 'b']
+                            for i, color in enumerate(colors):
+                                plt.plot(histograms[color], color=color, label=f'{color.upper()}')
+                            plt.xlim([0, 256])
+                            plt.legend()
+                            plt.grid(True)
+                            plt.show()
     else:
         print("Stag detection failed.")
-

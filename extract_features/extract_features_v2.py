@@ -275,8 +275,8 @@ class ExtractFeatures:
             x, y, w, h = cv2.boundingRect(point)
             width_mm = w * px_to_mm_scale
             height_mm = h * px_to_mm_scale
-            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 0, 255), 1)
-            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 255, 0), 1)
+            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
         # # Save
         # directory = 'features/medicine_measures'
@@ -293,8 +293,9 @@ class ExtractFeatures:
         return measured_img
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\img_0_010.jpg"
-    stag_id = 0
+    image_path = ".\\frames\\new_test_light\\thiago_fotos_10_lightoff\\img_11_004.jpg"
+    
+    stag_id = 11
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
