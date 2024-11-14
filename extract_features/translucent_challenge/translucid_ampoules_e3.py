@@ -120,18 +120,18 @@ class ExtractFeatures:
         return img_med
 
     def calculate_histograms(self, img_med):
-        "Calculates and returns RGB color histograms of an image, excluding any transparent pixels defined by the alpha channel."
-        histograms = {}
-        if img_med.shape[2] == 4: 
-            alpha_mask = img_med[:, :, 3] > 10  
-            img_bgr = img_med[alpha_mask, :3]  
-            img_rgb = cv2.cvtColor(img_bgr.reshape(-1, 1, 3), cv2.COLOR_BGR2RGB)
+        "Calculates and returns the grayscale histogram of an image, excluding any transparent pixels defined by the alpha channel."
+        histogram = {}
+        if img_med.shape[2] == 4:
+            alpha_mask = img_med[:, :, 3] > 10
+            img_bgr = img_med[alpha_mask, :3]
+            img_gray = cv2.cvtColor(img_bgr.reshape(-1, 1, 3), cv2.COLOR_BGR2GRAY)
 
-            colors = ('r', 'g', 'b')
-            for i, color in enumerate(colors):
-                hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
-                histograms[color] = hist.flatten()  
-            # # Save
+            # Calculate histogram for the grayscale image
+            hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
+            histogram['gray'] = hist.flatten()
+
+            # Uncomment the following code to save the histogram to a file
             # directory = 'features/histogram'
             # if not os.path.exists(directory):
             #     os.makedirs(directory)
@@ -141,10 +141,50 @@ class ExtractFeatures:
             #     file_number += 1
             #     file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
             # with open(file_path, 'wb') as file:
-            #     pickle.dump(histograms, file)
+            #     pickle.dump(histogram, file)
             # print(f"Histograms saved to {file_path}")
-        return histograms
+        return histogram
+    
+    def gaussian_filter(self, img_med):
+        image_gray = cv2.cvtColor(img_med, cv2.COLOR_BGR2GRAY)
+        img_gau_gray = cv2.GaussianBlur(image_gray, (35, 35), 0)
+        return img_gau_gray
+    
+    def sobel_filter(img_gau_gray, scale=1, delta=0, ddepth=cv2.CV_16S):
+        """
+        Apply the Sobel filter to detect edges in both horizontal and vertical directions.
+        
+        Parameters:
+        img_gau_gray : numpy.ndarray
+            The input grayscale image.
+        scale : int, optional
+            The scale factor for the computed derivative values.
+        delta : int, optional
+            The delta value added to the results prior to storing them.
+        ddepth : int, optional
+            The desired depth of the destination image.
+        
+        Returns:
+        numpy.ndarray
+            The image resulting from the Sobel filter.
+        """
+        # Gradient X
+        grad_x = cv2.Sobel(img_gau_gray, ddepth, 1, 0, ksize=3, scale=scale, delta=delta)
+        abs_grad_x = cv2.convertScaleAbs(grad_x)
 
+        # Gradient Y
+        grad_y = cv2.Sobel(img_gau_gray, ddepth, 0, 1, ksize=3, scale=scale, delta=delta)
+        abs_grad_y = cv2.convertScaleAbs(grad_y)
+
+        # Total Gradient (approximate)
+        img_sobel = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+
+        return img_sobel
+    
+    def otsu(self, img_gau):
+        _, otsu_binarized_image = cv2.threshold(img_gau, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        return otsu_binarized_image
+    
     def create_mask(self, img):
         """Creates a binary mask for the foreground object in the image and saves it with transparency."""
         if img.shape[2] == 4:
@@ -324,6 +364,34 @@ if __name__ == "__main__":
                         plt.title('Background Removed')
                         plt.show()
 
+                        # Supondo que img_med é sua imagem carregada e processada
+                        histogram = processor.calculate_histograms(img_med)
+
+                        # Plot do histograma em escala de cinza
+                        plt.figure(figsize=(10, 5))
+                        plt.title('Histograma em Escala de Cinza')
+                        plt.xlabel('Intensidade do Pixel')
+                        plt.ylabel('Quantidade de Pixels')
+                        plt.plot(histogram['gray'], color='gray', label='GRAY')
+                        plt.xlim([0, 256])
+                        plt.legend()
+                        plt.grid(True)
+                        plt.show()
+
+                        gau_img = processor.gaussian_filter(img_med)
+                        plt.imshow(gau_img, cmap='gray')
+                        plt.title ('Gaussian Image')
+                        plt.show()
+
+                        sobel_img = processor.sobel_filter(gau_img)
+                        plt.imshow(sobel_img, cmap= 'gray')
+                        plt.title ('Sobel Image')    
+
+                        otsu_img = processor.otsu(gau_img)
+                        plt.imshow(otsu_img, cmap='gray')
+                        plt.title ('Otsu Image')
+                        plt.show()
+
                         mask = processor.create_mask(background_removed)
                         plt.imshow(mask, cmap='gray')
                         plt.title('Mask')
@@ -346,20 +414,7 @@ if __name__ == "__main__":
                             plt.title('Measured Medicine')
                             plt.show()
 
-                            # histograms = processor.calculate_histograms(img_med)
-                    
-                            # # Plot dos histogramas RGB
-                            # plt.figure(figsize=(10, 5))
-                            # plt.title('Histograma RGB')
-                            # plt.xlabel('Intensidade do Pixel')
-                            # plt.ylabel('Quantidade de Pixels')
-                            # colors = ['r', 'g', 'b']
-                            # for i, color in enumerate(colors):
-                            #     plt.plot(histograms[color], color=color, label=f'{color.upper()}')
-                            # plt.xlim([0, 256])
-                            # plt.legend()
-                            # plt.grid(True)
-                            # plt.show()
+
     else:
         print("Stag detection failed.")
 
