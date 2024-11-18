@@ -294,9 +294,10 @@ class ExtractFeatures:
 
 if __name__ == "__main__":
     # image_path = ".\\frames\\new_test_light\\thiago_fotos_10_down_lighton_ampoules\\color_c1.jpg"
-    image_path = ".\\frames\\matte black box\\img_2_007.jpg"
+    image_path = ".\\frames\\new_pictures\\thiago_fotos_10_ampola02_black_lighton_andar0\\img_1_007.jpg"
+
     
-    stag_id = 2
+    stag_id = 1
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
