@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
@@ -196,21 +197,35 @@ class ExtractFeatures:
         plt.title('Histograma de Cores')
         plt.show()
 
-    def segment_colors(self, image, k=10):
+    def segment_colors(self, image, k=7):
         reshaped_image = np.float32(image.reshape(-1, 3))
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
         _, labels, centers = cv2.kmeans(reshaped_image, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
         centers = np.uint8(centers)
         segmented_image = centers[labels.flatten()]
         segmented_image = segmented_image.reshape(image.shape)
+
+        # save_dir = 'segmented_color_img'
+        # if not os.path.exists(save_dir):
+        #     os.makedirs(save_dir)
+
+        # file_number = 0
+        # file_path = os.path.join(save_dir, f'segmented_{file_number}.png')
+        # while os.path.exists(file_path):
+        #     file_number += 1
+        #     file_path = os.path.join(save_dir, f'segmented_{file_number}.png')
+        
+        # cv2.imwrite(file_path, segmented_image)
+        # print(f'Image saved as {file_path}')
+
         return segmented_image
 
     # restante das definições de métodos...
 
 if __name__ == "__main__":
     # image_path = ".\\frames\\new_test_light\\thiago_fotos_10_down_lighton_ampoules\\color_c1.jpg"
-    image_path = ".\\frames\\matte black box\\img_2_007.jpg"
-    stag_id = 2
+    image_path = ".\\frames\\canaleta_azul\\img_10_004.jpg"
+    stag_id = 10
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
@@ -231,56 +246,40 @@ if __name__ == "__main__":
                     plt.title('Cropped Scan Area')
                     plt.show()
 
-                    remove_bg = processor.remove_background(cropped)    
-                    plt.imshow(cv2.cvtColor(remove_bg, cv2.COLOR_BGR2RGB)) 
-                    plt.title('rembg show')   
+                   # Segmentando cores e mostrando resultado
+                    segmented = processor.segment_colors(cropped)
+                    plt.imshow(segmented, cmap='nipy_spectral')  
+                    plt.colorbar()  
+                    plt.title('Imagem Segmentada N-cores')
                     plt.show()
 
-                    binary_at_range = processor.bina_img(remove_bg)
-                    plt.imshow(binary_at_range, cmap='gray')
-                    plt.title('O bina')
+                    remove_bg = processor.remove_background(segmented)
+                    plt.imshow(cv2.cvtColor(remove_bg, cv2.COLOR_BGR2RGB))
+                    plt.title('Remove bg de IMG Segmentada')
                     plt.show()
 
-                    erode_image = processor.erode(binary_at_range)
-                    plt.imshow(erode_image, cmap='gray')
-                    plt.title('Erodes Play')
+                    remove_bg_by_cropped = processor.remove_background(cropped)
+                    plt.imshow(cv2.cvtColor(remove_bg_by_cropped, cv2.COLOR_BGR2RGB))
+                    plt.title('Remove bg img cropped original')
                     plt.show()
 
-                    dilated_image = processor.dilate(erode_image)
-                    plt.imshow(dilated_image, cmap='gray')
-                    plt.title('Dilated by Erode')
+                    segmented_2 = processor.segment_colors(remove_bg_by_cropped)
+                    plt.imshow(segmented_2, cmap='nipy_spectral')
+                    plt.colorbar()  
+                    plt.title('Kmeans - obj segmentado') 
                     plt.show()
 
-                    
-                    segmented = processor.segment_colors(remove_bg)
-                    plt.imshow(cv2.cvtColor(segmented, cv2.COLOR_BGR2RGB))
-                    plt.title('Imagem Segmentada')
-                    plt.show()
-                    
-                    otsu_img = processor.otsu(segmented)
-                    plt.imshow(otsu_img, cmap='gray')
-                    plt.title('Otsu ')
+                    otsu_img = processor.bina_img(segmented_2)
+                    otsu_img=~otsu_img
+                    plt.imshow(otsu_img)
+                    plt.title('bina') 
                     plt.show()
 
-
-
-                    sobel_img = processor.sobel_filter(otsu_img)
-                    plt.imshow(cv2.cvtColor(sobel_img, cv2.COLOR_BGR2RGB))
-                    plt.title('Sobel show')
+                    last_remove = processor.remove_background(otsu_img )
+                    plt.imshow(last_remove)
+                    plt.title('Last Remove TRY') 
                     plt.show()
 
-
-
-                    background_removed = processor.remove_background(sobel_img)
-                    if background_removed is not None:
-                        # Calculando e mostrando histogramas de cor
-                        processor.calculate_color_histograms(background_removed)
-                        
-                        # Segmentando cores e mostrando resultado
-                        segmented = processor.segment_colors(background_removed)
-                        plt.imshow(cv2.cvtColor(segmented, cv2.COLOR_BGR2RGB))
-                        plt.title('Imagem Segmentada')
-                        plt.show()
-                        # Outros processos podem seguir aqui...
+            
     else:
         print("Stag detection failed.")

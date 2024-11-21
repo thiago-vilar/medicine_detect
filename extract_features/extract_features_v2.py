@@ -89,14 +89,16 @@ class ExtractFeatures:
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
-        # #Save
-        # if not os.path.exists('features/cropped_imgs'):
-        #     os.makedirs('features/cropped_imgs')
+        ## Save
+        # directory_path = 'features/cropped_imgs'
+        # if not os.path.exists(directory_path):
+        #     os.makedirs(directory_path)    
         # file_number = 0
-        # while os.path.exists(f'features/cropped/img_cropped_{file_number}.jpg'):
+        # while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
         #     file_number += 1
-        # cv2.imwrite(f'features/cropped/img_cropped_{file_number}.jpg', cropped_image)
-        # print(f'Image saved as img_cropped_{file_number}.jpg')
+        # file_path = f'{directory_path}/img_cropped_{file_number}.png'
+        # cv2.imwrite(file_path, cropped_image)
+        # print(f'Image saved as {file_path}')
         return cropped_image
 
 
@@ -294,10 +296,8 @@ class ExtractFeatures:
 
 if __name__ == "__main__":
     # image_path = ".\\frames\\new_test_light\\thiago_fotos_10_down_lighton_ampoules\\color_c1.jpg"
-    image_path = ".\\frames\\new_pictures\\thiago_fotos_10_ampola02_black_lighton_andar0\\img_1_007.jpg"
-
-    
-    stag_id = 1
+    image_path = ".\\frames\\matte black box\\img_0_008.jpg"
+    stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
