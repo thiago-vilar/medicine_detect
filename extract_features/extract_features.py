@@ -111,14 +111,14 @@ class ExtractFeatures:
         img_med = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
         if img_med is None:
             raise ValueError("Failed to decode processed image.")
-        # # Save
-        # if not os.path.exists('features/medicine_png'):
-        #     os.makedirs('features/medicine_png')
-        # file_number = 0
-        # while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
-        #     file_number += 1
-        # cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
-        # print(f'Image saved as medicine_{file_number}.png with transparent background')
+        # Save
+        if not os.path.exists('features/medicine_png'):
+            os.makedirs('features/medicine_png')
+        file_number = 0
+        while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
+            file_number += 1
+        cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
+        print(f'Image saved as medicine_{file_number}.png with transparent background')
         return img_med
 
     def calculate_histograms(self, img_med):
@@ -296,7 +296,7 @@ class ExtractFeatures:
 
 if __name__ == "__main__":
     # image_path = ".\\frames\\new_test_light\\thiago_fotos_10_down_lighton_ampoules\\color_c1.jpg"
-    image_path = ".\\frames\\matte black box\\img_0_008.jpg"
+    image_path = ".\\frames\\img_0_010.jpg"
     stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
