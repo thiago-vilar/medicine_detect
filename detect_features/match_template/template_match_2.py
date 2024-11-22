@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 img = cv2.resize(cv2.imread('.\\frames\\img_0_010.jpg', 0), (0, 0), fx=0.8, fy=0.8)
-template = cv2.resize(cv2.imread('.\\features\\medicine_png\\medicine_1.png', 0), (0, 0), fx=0.8, fy=0.8)
+template = cv2.resize(cv2.imread('.\\features\\medicine_png\\medicine_0.png', 0), (0, 0), fx=0.8, fy=0.8)
 h, w = template.shape
 
 methods = [cv2.TM_CCOEFF, cv2.TM_CCOEFF_NORMED, cv2.TM_CCORR,

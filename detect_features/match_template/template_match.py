@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 # Ler a imagem original e o template
 img_original = cv2.imread('.\\frames\\img_0_010.jpg')
-template_original = cv2.imread('.\\features\\medicine_png\\medicine_1.png')  
+template_original = cv2.imread('.\\frame\\img_20241122_084925.png')  
 img_gray = cv2.cvtColor(img_original, cv2.COLOR_BGR2GRAY)
 img_gray = cv2.resize(img_gray, (0, 0), fx=0.8, fy=0.8)
 img_gray_color = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
