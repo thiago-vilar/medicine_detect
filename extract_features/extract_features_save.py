@@ -181,15 +181,15 @@ class ExtractFeatures:
                 mask_with_contours = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
                 mask_with_contours[:, :, 3] = mask  
                 cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)  
-                # #Save             
-                # directory = 'features/contour'
-                # if not os.path.exists(directory):
-                #     os.makedirs(directory)
-                # file_number = 0
-                # while os.path.exists(f'{directory}/contour_{file_number}.png'):
-                #     file_number += 1
-                # cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
-                # print(f'Contour image saved as contour_{file_number}.png in {directory}')
+                #Save             
+                directory = 'features/contours'
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                file_number = 0
+                while os.path.exists(f'{directory}/contour_{file_number}.png'):
+                    file_number += 1
+                cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
+                print(f'Contour image saved as contour_{file_number}.png in {directory}')
                 return mask_with_contours, largest_contour
         else:
             return None
@@ -231,20 +231,20 @@ class ExtractFeatures:
         move = (dx, dy)
         if move in moves:
             chain_code.append(moves[move])
-        # # Save
-        # directory = 'features/signature'
-        # if not os.path.exists(directory):
-        #     os.makedirs(directory)
-        # file_number = 0
-        # file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        # while os.path.exists(file_path):
-        #     file_number += 1
-        #     file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        # Save
+        directory = 'features/chain_code'
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        file_number = 0
+        file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        while os.path.exists(file_path):
+            file_number += 1
+            file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
         
-        # with open(file_path, 'wb') as file:
-        #     pickle.dump(chain_code, file)
-        # print(f"Chain code saved to {file_path}")
-        # print("Chain code sequence:", chain_code)
+        with open(file_path, 'wb') as file:
+            pickle.dump(chain_code, file)
+        print(f"Chain code saved to {file_path}")
+        print("Chain code sequence:", chain_code)
 
         return chain_code, len(chain_code)
 
