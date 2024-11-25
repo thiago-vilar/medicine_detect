@@ -149,7 +149,7 @@ class LoadContours:
             self.contours = pickle.load(f)
         with open(self.chain_code_path, 'rb') as f:
             self.chain_codes = pickle.load(f)
-            
+
 
 def calculate_contour_iou(contour1, contour2):
     contour2_resized = cv2.resize(contour2, (contour1.shape[1], contour1.shape[0]))
@@ -165,4 +165,4 @@ def calculate_chain_code_iou(chain_code1, chain_code2):
 
 
 if __name__ == "__main__":
-    #
+    processor = ExtractFeatures()
