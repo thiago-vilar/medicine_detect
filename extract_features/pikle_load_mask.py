@@ -156,146 +156,41 @@ class ExtractFeatures:
         mask = cv2.inRange(img, lower_bound, upper_bound)
         # Convert binary mask to 4-channel 
         mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
-        mask_rgba[:, :, 3] = mask  # Set alpha channel to mask
-        # # Save
+        mask_rgba[:, :, 3] = mask 
+
+        # # Save the mask as a .pkl file
         # directory = 'features/mask'
         # if not os.path.exists(directory):
         #     os.makedirs(directory)
         # file_number = 0
-        # while os.path.exists(f'{directory}/mask_{file_number}.png'):
+        # while os.path.exists(f'{directory}/mask_{file_number}.pkl'):
         #     file_number += 1
-        # cv2.imwrite(f'{directory}/mask_{file_number}.png', mask_rgba)
-        # print(f'Mask saved as mask_{file_number}.png with transparency in {directory}')
-        return mask
-    
-    def find_and_draw_contours(self, mask):
-        """Finds and draws only the largest contour around the foreground object based on the mask and saves the image with alpha transparency."""
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        if len(contours) > 0:
-            largest_contour = max(contours, key=cv2.contourArea)
-            if largest_contour.size > 0:
-                mask_with_contours = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
-                mask_with_contours[:, :, 3] = mask  
-                cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)  
-                # #Save             
-                # directory = 'features/contour'
-                # if not os.path.exists(directory):
-                #     os.makedirs(directory)
-                # file_number = 0
-                # while os.path.exists(f'{directory}/contour_{file_number}.png'):
-                #     file_number += 1
-                # cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
-                # print(f'Contour image saved as contour_{file_number}.png in {directory}')
-                return mask_with_contours, largest_contour
-        else:
-            return None
-
-    def compute_chain_code(self, contour):
-        ''' Calculates chain code for object contours for shape analysis. '''
-        start_point = contour[0][0]
-        current_point = start_point
-        chain_code = []
-        moves = {
-            (-1, 0) : 3,
-            (-1, 1) : 2,
-            (0, 1)  : 1,
-            (1, 1)  : 0,
-            (1, 0)  : 7,
-            (1, -1) : 6,
-            (0, -1) : 5,
-            (-1, -1): 4
-        }
-        for i in range(1, len(contour)):
-            next_point = contour[i][0]
-            dx = next_point[0] - current_point[0]
-            dy = next_point[1] - current_point[1]
-            if dx != 0:
-                dx = dx // abs(dx)
-            if dy != 0:
-                dy = dy // abs(dy)
-            move = (dx, dy)
-            if move in moves:
-                chain_code.append(moves[move])
-            current_point = next_point
-        # Close the loop
-        dx = start_point[0] - current_point[0]
-        dy = start_point[1] - current_point[1]
-        if dx != 0:
-            dx = dx // abs(dx)
-        if dy != 0:
-            dy = dy // abs(dy)
-        move = (dx, dy)
-        if move in moves:
-            chain_code.append(moves[move])
-        # # Save
-        # directory = 'features/signature'
-        # if not os.path.exists(directory):
-        #     os.makedirs(directory)
-        # file_number = 0
-        # file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        # while os.path.exists(file_path):
-        #     file_number += 1
-        #     file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        
+        # file_path = f'{directory}/mask_{file_number}.pkl'
         # with open(file_path, 'wb') as file:
-        #     pickle.dump(chain_code, file)
-        # print(f"Chain code saved to {file_path}")
-        # print("Chain code sequence:", chain_code)
+        #     pickle.dump(mask, file)
+        # print(f'Mask saved as {file_path} with transparency in {directory}')
 
-        return chain_code, len(chain_code)
+        return mask
 
-    def draw_chain_code(self, img_med, contour, chain_code):
-        ''' Draws the chain code on the image to visually represent contour direction changes. '''
-        start_point = tuple(contour[0][0])
-        current_point = start_point
-        moves = {
-            0: (1, 1),    # bottom-right
-            1: (0, 1),    # right
-            2: (-1, 1),   # top-right
-            3: (-1, 0),   # left
-            4: (-1, -1),  # top-left
-            5: (0, -1),   # left
-            6: (1, -1),   # bottom-left
-            7: (1, 0)     # bottom
-        }
-        for code in chain_code:
-            dx, dy = moves[code]
-            next_point = (current_point[0] + dx, current_point[1] + dy)
-            cv2.line(img_med, current_point, next_point, (255, 255, 255), 1)
-            current_point = next_point
-        return img_med, len(chain_code)
+def load_mask(file_path):
+    with open(file_path, 'rb') as file:
+        return pickle.load(file)
 
-    def medicine_measures(self, cropped_img, largest_contour):
-        ''' Measures the dimensions of the detected contours and appends to a list. '''
-        if not largest_contour:
-            print("No contours found.")
-            return None
-        stag_width_px = np.max(self.corners[:, 0]) - np.min(self.corners[:, 0])
-        px_to_mm_scale = 20 / stag_width_px
-        measured_img = cropped_img.copy()
-        for point in largest_contour:
-            x, y, w, h = cv2.boundingRect(point)
-            width_mm = w * px_to_mm_scale
-            height_mm = h * px_to_mm_scale
-            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 255, 0), 1)
-            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+def calculate_iou(mask1, mask2):
+    mask2_resized = cv2.resize(mask2, (mask1.shape[1], mask1.shape[0]))
+    intersection = np.logical_and(mask1, mask2_resized)
+    union = np.logical_or(mask1, mask2_resized)
+    return np.sum(intersection) / np.sum(union)
 
-        # # Save
-        # directory = 'features/medicine_measures'
-        # if not os.path.exists(directory):
-        #     os.makedirs(directory)
-        # file_number = 0
-        # file_path = os.path.join(directory, f'med_measure_{file_number}.png')
-        # while os.path.exists(file_path):
-        #     file_number += 1
-        #     file_path = os.path.join(directory, f'med_measure_{file_number}.png')
-        # cv2.imwrite(file_path, measured_img)
-        # print(f"Image saved as {file_path}")
-
-        return measured_img
+def display_image(image, title='Image', cmap=None):
+    plt.figure(figsize=(6, 6))
+    plt.imshow(image if cmap is None else image, cmap=cmap)
+    plt.title(title)
+    plt.axis('off')
+    plt.show()
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\thiago_fotos_10_feature_afternoon\\img_0_009.jpg"
+    image_path = ".\\frames\\thiago_fotos_10_recognition_afternoon\\img_0_010.jpg"
     stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
     if processor.detect_stag():
@@ -321,46 +216,25 @@ if __name__ == "__main__":
                     if background_removed is not None:
                         img_med = background_removed.copy()
                         plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
-                        plt.title('Background Removed')
+                        plt.title('Arq.png - Background Removed')
                         plt.show()
 
-                        mask = processor.create_mask(background_removed)
-                        plt.imshow(mask, cmap='gray')
-                        plt.title('Mask')
+                        mask1 = processor.create_mask(background_removed)
+                        plt.imshow(mask1, cmap='gray')
+                        plt.title('Mask 1')
                         plt.show()
 
-                        contoured_image, largest_contour = processor.find_and_draw_contours(mask)
-                        if contoured_image is not None and largest_contour is not None and largest_contour.size > 0:
-                            plt.imshow(cv2.cvtColor(contoured_image, cv2.COLOR_BGR2RGB))
-                            plt.title('Largest Contour by Mask')
-                            plt.show()
+        mask_file_path = '.\\features\\mask\\mask_0.pkl'
+        mask2 = load_mask(mask_file_path)
+        display_image(mask2, 'Mask 2 from .pkl', 'gray')
+        print(mask1.shape) 
+        print(mask2.shape)
 
-                            chain_code, _ = processor.compute_chain_code(largest_contour)  
-                            chain_drawn_image, _ = processor.draw_chain_code(img_med, largest_contour, chain_code)
-                            plt.imshow(cv2.cvtColor(chain_drawn_image, cv2.COLOR_BGR2RGB))
-                            plt.title('Chain Code Drawn')
-                            plt.show()
-
-                            measured_medicine = processor.medicine_measures(img_med, [largest_contour])
-                            plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
-                            plt.title('Measured Medicine')
-                            plt.show()
-
-                            # histograms = processor.calculate_histograms(img_med)
-                    
-                            # # Plot dos histogramas RGB
-                            # plt.figure(figsize=(10, 5))
-                            # plt.title('Histograma RGB')
-                            # plt.xlabel('Intensidade do Pixel')
-                            # plt.ylabel('Quantidade de Pixels')
-                            # colors = ['r', 'g', 'b']
-                            # for i, color in enumerate(colors):
-                            #     plt.plot(histograms[color], color=color, label=f'{color.upper()}')
-                            # plt.xlim([0, 256])
-                            # plt.legend()
-                            # plt.grid(True)
-                            # plt.show()
-    else:
-        print("Stag detection failed.")
-
-
+        iou = calculate_iou(mask1, mask2)
+        print(f'IoU Score: {iou:.2f}')
+        if iou == 1.0 or iou >= 0.8:
+            print('The masks are identical.')
+        elif iou < 0.8 and iou >=0.4:
+            print('The mask has low similarity')
+        else:
+            print('The masks are not similar.')

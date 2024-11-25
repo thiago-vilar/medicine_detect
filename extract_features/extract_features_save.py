@@ -156,16 +156,20 @@ class ExtractFeatures:
         mask = cv2.inRange(img, lower_bound, upper_bound)
         # Convert binary mask to 4-channel 
         mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
-        mask_rgba[:, :, 3] = mask  # Set alpha channel to mask
-        # # Save
+        mask_rgba[:, :, 3] = mask 
+
+        # # Save the mask as a .pkl file
         # directory = 'features/mask'
         # if not os.path.exists(directory):
         #     os.makedirs(directory)
         # file_number = 0
-        # while os.path.exists(f'{directory}/mask_{file_number}.png'):
+        # while os.path.exists(f'{directory}/mask_{file_number}.pkl'):
         #     file_number += 1
-        # cv2.imwrite(f'{directory}/mask_{file_number}.png', mask_rgba)
-        # print(f'Mask saved as mask_{file_number}.png with transparency in {directory}')
+        # file_path = f'{directory}/mask_{file_number}.pkl'
+        # with open(file_path, 'wb') as file:
+        #     pickle.dump(mask, file)
+        # print(f'Mask saved as {file_path} with transparency in {directory}')
+
         return mask
     
     def find_and_draw_contours(self, mask):
@@ -321,7 +325,7 @@ if __name__ == "__main__":
                     if background_removed is not None:
                         img_med = background_removed.copy()
                         plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
-                        plt.title('Background Removed')
+                        plt.title('Arq.png - Background Removed')
                         plt.show()
 
                         mask = processor.create_mask(background_removed)
