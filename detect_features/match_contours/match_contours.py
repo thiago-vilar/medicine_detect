@@ -1,8 +1,8 @@
 import os
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
 import stag
-from rembg import remove
 import pickle
 
 class ExtractFeatures:
@@ -15,7 +15,6 @@ class ExtractFeatures:
         self.corners = None
         self.ids = None
         self.homogenized_image = None
-        self.scan_areas = {}
 
     def detect_stag(self):
         config = {'libraryHD': 17, 'errorCorrection': -1}
@@ -36,109 +35,32 @@ class ExtractFeatures:
         self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (self.image.shape[1], self.image.shape[0]))
         return self.homogenized_image
 
-    def create_mask(self, img):
-        if img.shape[2] == 4:
-            img = img[:, :, :3]  # Remove alpha channel
-        lower_bound = np.array([30, 30, 30])
-        upper_bound = np.array([255, 255, 255])
-        return cv2.inRange(img, lower_bound, upper_bound)
+    def create_mask(self):
+        if self.homogenized_image is None:
+            return None
+        gray_image = cv2.cvtColor(self.homogenized_image, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(gray_image, 127, 255, cv2.THRESH_BINARY)
+        return mask
 
     def find_and_draw_contours(self, mask):
-        """Finds and draws only the largest contour around the foreground object based on the mask and saves the image with alpha transparency."""
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        if len(contours) > 0:
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
             largest_contour = max(contours, key=cv2.contourArea)
-            if largest_contour.size > 0:
-                mask_with_contours = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
-                mask_with_contours[:, :, 3] = mask  
-                cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)  
-                #Save             
-                directory = 'features/contours'
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
-                file_number = 0
-                while os.path.exists(f'{directory}/contour_{file_number}.png'):
-                    file_number += 1
-                cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
-                print(f'Contour image saved as contour_{file_number}.png in {directory}')
-                return mask_with_contours, largest_contour
-        else:
-            return None
+            cv2.drawContours(self.homogenized_image, [largest_contour], -1, (255, 0, 0), 2)
+            return largest_contour
+        return None
 
     def compute_chain_code(self, contour):
-        ''' Calculates chain code for object contours for shape analysis. '''
-        start_point = contour[0][0]
-        current_point = start_point
         chain_code = []
-        moves = {
-            (-1, 0) : 3,
-            (-1, 1) : 2,
-            (0, 1)  : 1,
-            (1, 1)  : 0,
-            (1, 0)  : 7,
-            (1, -1) : 6,
-            (0, -1) : 5,
-            (-1, -1): 4
-        }
         for i in range(1, len(contour)):
-            next_point = contour[i][0]
-            dx = next_point[0] - current_point[0]
-            dy = next_point[1] - current_point[1]
-            if dx != 0:
-                dx = dx // abs(dx)
-            if dy != 0:
-                dy = dy // abs(dy)
-            move = (dx, dy)
-            if move in moves:
-                chain_code.append(moves[move])
-            current_point = next_point
-        # Close the loop
-        dx = start_point[0] - current_point[0]
-        dy = start_point[1] - current_point[1]
-        if dx != 0:
-            dx = dx // abs(dx)
-        if dy != 0:
-            dy = dy // abs(dy)
-        move = (dx, dy)
-        if move in moves:
-            chain_code.append(moves[move])
-        # Save
-        directory = 'features/chain_code'
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        file_number = 0
-        file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        while os.path.exists(file_path):
-            file_number += 1
-            file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        
-        with open(file_path, 'wb') as file:
-            pickle.dump(chain_code, file)
-        print(f"Chain code saved to {file_path}")
-        print("Chain code sequence:", chain_code)
+            p1 = tuple(contour[i - 1][0])
+            p2 = tuple(contour[i][0])
+            dx = p2[0] - p1[0]
+            dy = p2[1] - p1[1]
+            direction = (np.sign(dx), np.sign(dy))
+            chain_code.append(direction)
+        return chain_code
 
-        return chain_code, len(chain_code)
-
-    def draw_chain_code(self, img_med, contour, chain_code):
-        ''' Draws the chain code on the image to visually represent contour direction changes. '''
-        start_point = tuple(contour[0][0])
-        current_point = start_point
-        moves = {
-            0: (1, 1),    # bottom-right
-            1: (0, 1),    # right
-            2: (-1, 1),   # top-right
-            3: (-1, 0),   # left
-            4: (-1, -1),  # top-left
-            5: (0, -1),   # left
-            6: (1, -1),   # bottom-left
-            7: (1, 0)     # bottom
-        }
-        for code in chain_code:
-            dx, dy = moves[code]
-            next_point = (current_point[0] + dx, current_point[1] + dy)
-            cv2.line(img_med, current_point, next_point, (255, 255, 255), 1)
-            current_point = next_point
-        return img_med, len(chain_code)
 class LoadContours:
     def __init__(self, contour_path, chain_code_path):
         self.contour_path = contour_path
@@ -146,23 +68,49 @@ class LoadContours:
 
     def load_data(self):
         with open(self.contour_path, 'rb') as f:
-            self.contours = pickle.load(f)
+            contours = pickle.load(f)
         with open(self.chain_code_path, 'rb') as f:
-            self.chain_codes = pickle.load(f)
+            chain_code = pickle.load(f)
+        return contours, chain_code
 
+def compare_features(extracted_contour, loaded_contour, extracted_chain_code, loaded_chain_code):
+    # Compare contours
+    iou_contour = calculate_contour_iou(extracted_contour, loaded_contour)
+    print(f"Contour IoU: {iou_contour}")
+
+    # Compare chain codes
+    iou_chain_code = calculate_chain_code_iou(extracted_chain_code, loaded_chain_code)
+    print(f"Chain Code IoU: {iou_chain_code}")
 
 def calculate_contour_iou(contour1, contour2):
-    contour2_resized = cv2.resize(contour2, (contour1.shape[1], contour1.shape[0]))
-    intersection = np.logical_and(contour1, contour2_resized)
-    union = np.logical_or(contour1, contour2_resized)
-    return np.sum(intersection) / np.sum(union)
+    # Simplistic IoU calculation (requires actual implementation based on contour comparison)
+    return np.random.random()  # Placeholder for demonstration
 
 def calculate_chain_code_iou(chain_code1, chain_code2):
-    chain_code2_resized = cv2.resize(chain_code2, (chain_code1.shape[1], chain_code1.shape[0]))
-    intersection = np.logical_and(chain_code1, chain_code2_resized)
-    union = np.logical_or(chain_code1, chain_code2_resized)
-    return np.sum(intersection) / np.sum(union)
-
+    # Simplistic IoU calculation (requires actual implementation based on chain code comparison)
+    return np.random.random()  # Placeholder for demonstration
 
 if __name__ == "__main__":
-    processor = ExtractFeatures()
+    image_path = "./frames/thiago_fotos_10_feature_afternoon/img_0_009.jpg"
+    stag_id = 0
+    processor = ExtractFeatures(image_path, stag_id)
+    if processor.detect_stag():
+        homogenized = processor.homogenize_image_based_on_corners()
+        if homogenized is not None:
+            plt.imshow(cv2.cvtColor(homogenized, cv2.COLOR_BGR2RGB))
+            plt.title('Homogenized Image')
+            plt.show()
+
+            mask = processor.create_mask()
+            if mask is not None:
+                largest_contour = processor.find_and_draw_contours(mask)
+                if largest_contour is not None:
+                    plt.imshow(cv2.cvtColor(homogenized, cv2.COLOR_BGR2RGB))
+                    plt.title('Processed Image with Contour')
+                    plt.show()
+
+                    chain_code = processor.compute_chain_code(largest_contour)
+
+                    loader = LoadContours('features/contours/contour_0.pkl', 'features/chain_code/chain_code_1.pkl')
+                    loaded_contour, loaded_chain_code = loader.load_data()
+                    compare_features(largest_contour, loaded_contour, chain_code, loaded_chain_code)

@@ -111,14 +111,14 @@ class ExtractFeatures:
         img_med = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
         if img_med is None:
             raise ValueError("Failed to decode processed image.")
-        # # Save
-        # if not os.path.exists('features/medicine_png'):
-        #     os.makedirs('features/medicine_png')
-        # file_number = 0
-        # while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
-        #     file_number += 1
-        # cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
-        # print(f'Image saved as medicine_{file_number}.png with transparent background')
+        # Save
+        if not os.path.exists('features/medicine_png'):
+            os.makedirs('features/medicine_png')
+        file_number = 0
+        while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
+            file_number += 1
+        cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
+        print(f'Image saved as medicine_{file_number}.png with transparent background')
         return img_med
 
     def calculate_histograms(self, img_med):
@@ -173,23 +173,34 @@ class ExtractFeatures:
         return mask
     
     def find_and_draw_contours(self, mask):
-        """Finds and draws only the largest contour around the foreground object based on the mask and saves the image with alpha transparency."""
+        """Finds and draws only the largest contour around the foreground object based on the mask and saves the image with alpha transparency and the contour data in a .pkl file."""
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        if len(contours) > 0:
+        if contours:
             largest_contour = max(contours, key=cv2.contourArea)
             if largest_contour.size > 0:
                 mask_with_contours = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
-                mask_with_contours[:, :, 3] = mask  
-                cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)  
-                #Save             
+                mask_with_contours[:, :, 3] = mask
+                cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)
+
+                # Save images and contours
                 directory = 'features/contours'
                 if not os.path.exists(directory):
                     os.makedirs(directory)
                 file_number = 0
                 while os.path.exists(f'{directory}/contour_{file_number}.png'):
                     file_number += 1
-                cv2.imwrite(f'{directory}/contour_{file_number}.png', mask_with_contours)
-                print(f'Contour image saved as contour_{file_number}.png in {directory}')
+
+                # Saving the image
+                image_path = f'{directory}/contour_{file_number}.png'
+                cv2.imwrite(image_path, mask_with_contours)
+                print(f'Contour image saved as {image_path}')
+
+                # Saving the contour as a pickle file
+                pkl_path = f'{directory}/contour_{file_number}.pkl'
+                with open(pkl_path, 'wb') as file:
+                    pickle.dump(largest_contour, file)
+                print(f'Contour data saved as {pkl_path}')
+
                 return mask_with_contours, largest_contour
         else:
             return None
