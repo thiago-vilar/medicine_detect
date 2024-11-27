@@ -111,14 +111,14 @@ class ExtractFeatures:
         img_med = cv2.imdecode(np.frombuffer(output_image, np.uint8), cv2.IMREAD_UNCHANGED)
         if img_med is None:
             raise ValueError("Failed to decode processed image.")
-        # Save
-        if not os.path.exists('features/medicine_png'):
-            os.makedirs('features/medicine_png')
-        file_number = 0
-        while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
-            file_number += 1
-        cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
-        print(f'Image saved as medicine_{file_number}.png with transparent background')
+        # # Save
+        # if not os.path.exists('features/medicine_png'):
+        #     os.makedirs('features/medicine_png')
+        # file_number = 0
+        # while os.path.exists(f'features/medicine_png/medicine_{file_number}.png'):
+        #     file_number += 1
+        # cv2.imwrite(f'features/medicine_png/medicine_{file_number}.png', img_med)
+        # print(f'Image saved as medicine_{file_number}.png with transparent background')
         return img_med
 
     def calculate_histograms(self, img_med):
@@ -182,24 +182,24 @@ class ExtractFeatures:
                 mask_with_contours[:, :, 3] = mask
                 cv2.drawContours(mask_with_contours, [largest_contour], -1, (0, 0, 255, 255), 2)
 
-                # Save images and contours
-                directory = 'features/contours'
-                if not os.path.exists(directory):
-                    os.makedirs(directory)
-                file_number = 0
-                while os.path.exists(f'{directory}/contour_{file_number}.png'):
-                    file_number += 1
+                # # Save images and contours
+                # directory = 'features/contours'
+                # if not os.path.exists(directory):
+                #     os.makedirs(directory)
+                # file_number = 0
+                # while os.path.exists(f'{directory}/contour_{file_number}.png'):
+                #     file_number += 1
 
-                # Saving the image
-                image_path = f'{directory}/contour_{file_number}.png'
-                cv2.imwrite(image_path, mask_with_contours)
-                print(f'Contour image saved as {image_path}')
+                # # Saving the image
+                # image_path = f'{directory}/contour_{file_number}.png'
+                # cv2.imwrite(image_path, mask_with_contours)
+                # print(f'Contour image saved as {image_path}')
 
-                # Saving the contour as a pickle file
-                pkl_path = f'{directory}/contour_{file_number}.pkl'
-                with open(pkl_path, 'wb') as file:
-                    pickle.dump(largest_contour, file)
-                print(f'Contour data saved as {pkl_path}')
+                # # Saving the contour as a pickle file
+                # pkl_path = f'{directory}/contour_{file_number}.pkl'
+                # with open(pkl_path, 'wb') as file:
+                #     pickle.dump(largest_contour, file)
+                # print(f'Contour data saved as {pkl_path}')
 
                 return mask_with_contours, largest_contour
         else:
@@ -242,20 +242,20 @@ class ExtractFeatures:
         move = (dx, dy)
         if move in moves:
             chain_code.append(moves[move])
-        # Save
-        directory = 'features/chain_code'
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        file_number = 0
-        file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
-        while os.path.exists(file_path):
-            file_number += 1
-            file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        # # Save
+        # directory = 'features/chain_code'
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        # file_number = 0
+        # file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
+        # while os.path.exists(file_path):
+        #     file_number += 1
+        #     file_path = os.path.join(directory, f'chain_code_{file_number}.pkl')
         
-        with open(file_path, 'wb') as file:
-            pickle.dump(chain_code, file)
-        print(f"Chain code saved to {file_path}")
-        print("Chain code sequence:", chain_code)
+        # with open(file_path, 'wb') as file:
+        #     pickle.dump(chain_code, file)
+        # print(f"Chain code saved to {file_path}")
+        # print("Chain code sequence:", chain_code)
 
         return chain_code, len(chain_code)
 
@@ -281,33 +281,42 @@ class ExtractFeatures:
         return img_med, len(chain_code)
 
     def medicine_measures(self, cropped_img, largest_contour):
-        ''' Measures the dimensions of the detected contours and appends to a list. '''
-        if not largest_contour:
+        ''' Measures the dimensions of the detected contours and returns a list of measures. '''
+        if largest_contour is None or len(largest_contour) == 0:
             print("No contours found.")
             return None
+        
         stag_width_px = np.max(self.corners[:, 0]) - np.min(self.corners[:, 0])
         px_to_mm_scale = 20 / stag_width_px
+        measures = []
         measured_img = cropped_img.copy()
+
         for point in largest_contour:
             x, y, w, h = cv2.boundingRect(point)
             width_mm = w * px_to_mm_scale
             height_mm = h * px_to_mm_scale
-            cv2.rectangle(measured_img, (x, y), (x+w, y+h), (0, 255, 0), 1)
-            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+            measures.append((width_mm, height_mm))
 
-        # # Save
-        # directory = 'features/medicine_measures'
-        # if not os.path.exists(directory):
-        #     os.makedirs(directory)
-        # file_number = 0
-        # file_path = os.path.join(directory, f'med_measure_{file_number}.png')
-        # while os.path.exists(file_path):
-        #     file_number += 1
-        #     file_path = os.path.join(directory, f'med_measure_{file_number}.png')
-        # cv2.imwrite(file_path, measured_img)
-        # print(f"Image saved as {file_path}")
+            # Desenha os retângulos e medidas
+            cv2.rectangle(measured_img, (x, y), (x + w, y + h), (0, 255, 0), 1)
+            cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", 
+                        (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-        return measured_img
+        # Salva a imagem e as medidas
+        directory = 'features/medicine_measures'
+        os.makedirs(directory, exist_ok=True)
+        file_path_img = os.path.join(directory, 'measured_medicine.png')
+        cv2.imwrite(file_path_img, measured_img)
+
+        file_path_pkl = os.path.join(directory, 'measured_medicine.pkl')
+        with open(file_path_pkl, 'wb') as file:
+            pickle.dump(measures, file)
+
+        # print(f"Measures image saved as {file_path_img}")
+        print(f"Measures data saved as {file_path_pkl}")
+
+        return measures, measured_img
+    
 
 if __name__ == "__main__":
     image_path = ".\\frames\\thiago_fotos_10_feature_afternoon\\img_0_009.jpg"
@@ -356,7 +365,7 @@ if __name__ == "__main__":
                             plt.title('Chain Code Drawn')
                             plt.show()
 
-                            measured_medicine = processor.medicine_measures(img_med, [largest_contour])
+                            _, measured_medicine = processor.medicine_measures(img_med, [largest_contour])
                             plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
                             plt.title('Measured Medicine')
                             plt.show()

@@ -278,6 +278,7 @@ if __name__ == "__main__":
     image_path = ".\\frames\\thiago_fotos_10_feature_afternoon\\img_0_009.jpg"
     stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
+
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
         if homogenized is not None:
@@ -313,19 +314,37 @@ if __name__ == "__main__":
                         if largest_contour is not None:
                             chain_code, _ = processor.compute_chain_code(largest_contour)
 
-                            # Carregando contornos e códigos de cadeia salvos
+                            # Carregar contornos e chain codes salvos
                             loader = LoadContours('features/contours/contour_0.pkl', 'features/chain_code/chain_code_1.pkl')
                             loaded_contour, loaded_chain_code = loader.load_data()
 
-                            # Comparação
+                            # Comparar Contornos
                             shape = mask.shape
                             iou_contour = calculate_contour_iou(largest_contour, loaded_contour, shape)
                             print(f"IoU Score for Contour: {iou_contour:.2f}")
 
+                            # Exibir os contornos extraído e carregado
+                            blank_image = np.zeros(mask.shape, dtype=np.uint8)
+                            cv2.drawContours(blank_image, [largest_contour], -1, 255, 2)
+                            plt.imshow(blank_image, cmap='gray')
+                            plt.title('Extracted Contour')
+                            plt.show()
+
+                            blank_image_loaded = np.zeros(mask.shape, dtype=np.uint8)
+                            cv2.drawContours(blank_image_loaded, [loaded_contour], -1, 255, 2)
+                            plt.imshow(blank_image_loaded, cmap='gray')
+                            plt.title('Loaded Contour')
+                            plt.show()
+
+                            # Comparar Chain Codes
                             iou_chain_code = calculate_chain_code_iou(chain_code, loaded_chain_code)
                             print(f"IoU Score for Chain Code: {iou_chain_code:.2f}")
 
-                            # Avaliação do IoU
+                            # Exibir os chain codes extraído e carregado
+                            print("Extracted Chain Code:", chain_code)
+                            print("Loaded Chain Code:", loaded_chain_code)
+
+                            # Avaliação do IoU para contornos
                             if iou_contour == 1.0:
                                 print("The contours are identical.")
                             elif iou_contour >= 0.7:
