@@ -124,7 +124,7 @@ class ExtractFeatures:
         """Creates a binary mask for the foreground object in the image and saves it with transparency."""
         if img.shape[2] == 4:
             img = img[:, :, :3]  # Remove alpha channel
-        lower_bound = np.array([30, 30, 30])
+        lower_bound = np.array([80, 80, 80])
         upper_bound = np.array([255, 255, 255])
         mask = cv2.inRange(img, lower_bound, upper_bound)
         # Convert binary mask to 4-channel 
@@ -275,7 +275,7 @@ def calculate_chain_code_iou(chain_code1, chain_code2):
 
 
 if __name__ == "__main__":
-    image_path = ".\\frames\\thiago_fotos_10_feature_afternoon\\img_0_009.jpg"
+    image_path = ".\\frames\\thiago_fotos_10_recognition_afternoon\\img_0_005.jpg"
     stag_id = 0
     processor = ExtractFeatures(image_path, stag_id)
 
@@ -346,10 +346,19 @@ if __name__ == "__main__":
 
                             # Avaliação do IoU para contornos
                             if iou_contour == 1.0:
-                                print("The contours are identical.")
-                            elif iou_contour >= 0.7:
-                                print("The contours are highly similar.")
-                            elif iou_contour >= 0.4:
-                                print("The contours have low similarity.")
+                                print(f"The contours are identical: {iou_contour:.2f}")
+                            elif iou_contour > 0.4:
+                                print(f"The contours are highly similar: {iou_contour:.2f}")
+                            elif iou_contour <= 0.4:
+                                print(f"The contours have low similarity: {iou_contour:.2f}")
                             else:
-                                print("The contours are not similar.")
+                                print(f"The contours are not similar: {iou_contour:.2f}")
+
+                            if iou_chain_code == 1.0:
+                                print(f"Tehe chain code are identical: {iou_chain_code:.2f}")
+                            elif iou_chain_code >= 0.7:
+                                print(f"The contours are highly similar: {iou_chain_code:.2f}")
+                            elif iou_chain_code >= 0.4:
+                                print(f"The contours have low similarity: {iou_chain_code:.2f}")
+                            else:
+                                print(f"The contours are not similar: {iou_chain_code:.2f}")

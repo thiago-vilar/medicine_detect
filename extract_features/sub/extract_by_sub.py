@@ -89,16 +89,16 @@ class ExtractFeatures:
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
-        # Save
-        directory_path = 'features/cropped_imgs'
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)    
-        file_number = 0
-        while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
-            file_number += 1
-        file_path = f'{directory_path}/img_cropped_{file_number}.png'
-        cv2.imwrite(file_path, cropped_image)
-        print(f'Image saved as {file_path}')
+        # # Save
+        # directory_path = 'features/cropped_imgs'
+        # if not os.path.exists(directory_path):
+        #     os.makedirs(directory_path)    
+        # file_number = 0
+        # while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
+        #     file_number += 1
+        # file_path = f'{directory_path}/img_cropped_{file_number}.png'
+        # cv2.imwrite(file_path, cropped_image)
+        # print(f'Image saved as {file_path}')
         return cropped_image
 
 

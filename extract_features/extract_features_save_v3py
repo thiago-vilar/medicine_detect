@@ -89,18 +89,26 @@ class ExtractFeatures:
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
-        # Save
-        directory_path = 'features/cropped_imgs'
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)    
-        file_number = 0
-        while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
-            file_number += 1
-        file_path = f'{directory_path}/img_cropped_{file_number}.png'
-        cv2.imwrite(file_path, cropped_image)
-        print(f'Image saved as {file_path}')
+        # # Save
+        # directory_path = 'features/cropped_imgs'
+        # if not os.path.exists(directory_path):
+        #     os.makedirs(directory_path)    
+        # file_number = 0
+        # while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
+        #     file_number += 1
+        # file_path = f'{directory_path}/img_cropped_{file_number}.png'
+        # cv2.imwrite(file_path, cropped_image)
+        # print(f'Image saved as {file_path}')
         return cropped_image
 
+    def filter_gray_laplacian(self, image):
+
+        kernel_size = 3
+        ddepth = cv2.CV_16S
+        image = cv2.imread(image)
+        img_gray = cv2.COLOR_BGR2GRAY(image)
+        img_filtered = cv2.Laplacian(img_gray, ddepth, ksize=kernel_size)
+        return img_filtered
 
     def remove_background(self, image_np_array):
         """Removes the background from the cropped scan area and saves the image with alpha channel."""
@@ -340,8 +348,12 @@ if __name__ == "__main__":
                     plt.imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
                     plt.title('Cropped Scan Area')
                     plt.show()
+                    filtered_lap = processor.filter_gray_laplacian(cropped)
+                    plt.imshow(cv2.cvtColor(filtered_lap, cmap = 'gray'))
+                    plt.title('Lapacian gray')
+                    plt.show()
 
-                    background_removed = processor.remove_background(cropped)
+                    background_removed = processor.remove_background(filtered_lap)
                     if background_removed is not None:
                         img_med = background_removed.copy()
                         plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
