@@ -1,17 +1,17 @@
 import os
 import cv2
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 import stag
 from rembg import remove
 import pickle
 
-
 class ExtractFeatures:
-    ''' Initializes with the path to an image and a specific marker (stag) ID. '''
-    def __init__(self, image_path, stag_id):
+    def __init__(self, image_path, stag_id, med_type):
         self.image_path = image_path
         self.stag_id = stag_id
+        self.med_type = med_type
         self.image = cv2.imread(self.image_path)
         if self.image is None:
             raise ValueError("Image could not be loaded.")
@@ -19,7 +19,8 @@ class ExtractFeatures:
         self.ids = None
         self.homogenized_image = None
         self.scan_areas = {}
-        self.pixel_size_mm = None 
+        self.pixel_size_mm = None
+        self.data = []
 
     ''' Detects a predefined stag marker in the image using the stag library. '''
     def detect_stag(self):
@@ -54,7 +55,7 @@ class ExtractFeatures:
         transform_matrix = cv2.getPerspectiveTransform(self.corners, aligned_corners)
         self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (self.image.shape[1], self.image.shape[0]))
         return self.homogenized_image
-
+    
     ''' Displays the scan area on the homogenized image based on the stag location. '''
     def display_scan_area_by_markers(self):
         if self.homogenized_image is None:
@@ -101,14 +102,25 @@ class ExtractFeatures:
         # print(f'Image saved as {file_path}')
         return cropped_image
 
-    def filter_gray_laplacian(self, image):
+    def filter_gray_laplacian(self,image):
 
-        kernel_size = 3
-        ddepth = cv2.CV_16S
-        image = cv2.imread(image)
-        img_gray = cv2.COLOR_BGR2GRAY(image)
-        img_filtered = cv2.Laplacian(img_gray, ddepth, ksize=kernel_size)
-        return img_filtered
+        img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Definindo o kernel Laplaciano
+        kernel = np.array([
+             [0, 1, 0],
+             [1, -5, 1],
+             [0, 1, 0]
+        ])
+
+        # Aplicando o filtro Laplaciano
+        ddepth = cv2.CV_16S  
+        img_filtered = cv2.filter2D(img_gray, ddepth, kernel)
+
+        abs_img_filtered = cv2.convertScaleAbs(img_filtered)
+
+
+        return abs_img_filtered
 
     def remove_background(self, image_np_array):
         """Removes the background from the cropped scan area and saves the image with alpha channel."""
@@ -130,37 +142,30 @@ class ExtractFeatures:
         return img_med
 
     def calculate_histograms(self, img_med):
-        "Calculates and returns RGB color histograms of an image, excluding any transparent pixels defined by the alpha channel."
         histograms = {}
-        if img_med.shape[2] == 4: 
-            alpha_mask = img_med[:, :, 3] > 10  
-            img_bgr = img_med[alpha_mask, :3]  
-            img_rgb = cv2.cvtColor(img_bgr.reshape(-1, 1, 3), cv2.COLOR_BGR2RGB)
+        if img_med.shape[2] == 4:  # If alpha channel exists
+            alpha_mask = img_med[:, :, 3] > 10
+            img_bgr = img_med[alpha_mask, :3]
+        else:
+            img_bgr = img_med
 
-            colors = ('r', 'g', 'b')
-            for i, color in enumerate(colors):
-                hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
-                histograms[color] = hist.flatten()  
-            # # Save
-            # directory = 'features/histogram'
-            # if not os.path.exists(directory):
-            #     os.makedirs(directory)
-            # file_number = 0
-            # file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
-            # while os.path.exists(file_path):
-            #     file_number += 1
-            #     file_path = os.path.join(directory, f'histogram_{file_number}.pkl')
-            # with open(file_path, 'wb') as file:
-            #     pickle.dump(histograms, file)
-            # print(f"Histograms saved to {file_path}")
+        # Convert BGR to RGB
+        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+
+        # Calculate histograms for each channel
+        colors = ('r', 'g', 'b')
+        for i, color in enumerate(colors):
+            hist = cv2.calcHist([img_rgb], [i], None, [256], [0, 256])
+            histograms[color] = hist.flatten()
         return histograms
+
 
     def create_mask(self, img):
         """Creates a binary mask for the foreground object in the image and saves it with transparency."""
         if img.shape[2] == 4:
             img = img[:, :, :3]  # Remove alpha channel
         lower_bound = np.array([30, 30, 30])
-        upper_bound = np.array([255, 255, 255])
+        upper_bound = np.array([256, 256, 256])
         mask = cv2.inRange(img, lower_bound, upper_bound)
         # Convert binary mask to 4-channel 
         mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
@@ -310,26 +315,81 @@ class ExtractFeatures:
             cv2.putText(measured_img, f"{width_mm:.1f}mm x {height_mm:.1f}mm", 
                         (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
 
-        # Salva a imagem e as medidas
-        directory = 'features/medicine_measures'
-        os.makedirs(directory, exist_ok=True)
-        file_path_img = os.path.join(directory, 'measured_medicine.png')
-        cv2.imwrite(file_path_img, measured_img)
+        # # Salva a imagem e as medidas
+        # directory = 'features/medicine_measures'
+        # os.makedirs(directory, exist_ok=True)
+        # file_path_img = os.path.join(directory, 'measured_medicine.png')
+        # cv2.imwrite(file_path_img, measured_img)
 
-        file_path_pkl = os.path.join(directory, 'measured_medicine.pkl')
-        with open(file_path_pkl, 'wb') as file:
-            pickle.dump(measures, file)
+        # file_path_pkl = os.path.join(directory, 'measured_medicine.pkl')
+        # with open(file_path_pkl, 'wb') as file:
+        #     pickle.dump(measures, file)
 
-        # print(f"Measures image saved as {file_path_img}")
-        print(f"Measures data saved as {file_path_pkl}")
+        # # print(f"Measures image saved as {file_path_img}")
+        # print(f"Measures data saved as {file_path_pkl}")
 
         return measures, measured_img
-    
 
-if __name__ == "__main__":
-    image_path = ".\\frames\\thiago_fotos_10_feature_afternoon\\img_0_009.jpg"
-    stag_id = 0
-    processor = ExtractFeatures(image_path, stag_id)
+    def collect_data(self, img_med, mask, largest_contour, chain_code, measures, histograms):
+        # Ensure the directory for saving images exists
+        images_directory = "extracted_features/images"
+        os.makedirs(images_directory, exist_ok=True)
+
+        # Save the median image with background removed
+        med_img_path = os.path.join(images_directory, f"{self.stag_id}_img_med.png")
+        cv2.imwrite(med_img_path, img_med)
+
+        # Save the mask image
+        mask_img_path = os.path.join(images_directory, f"{self.stag_id}_mask.png")
+        mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)  # Convert mask to RGBA for visibility
+        mask_rgba[:, :, 3] = mask  # Apply the mask to the alpha channel
+        cv2.imwrite(mask_img_path, mask_rgba)
+
+        # Assuming you want to save contour drawing
+        contour_img_path = os.path.join(images_directory, f"{self.stag_id}_contour.png")
+        contour_img = img_med.copy()
+        cv2.drawContours(contour_img, [largest_contour], -1, (0, 255, 0), 3)
+        cv2.imwrite(contour_img_path, contour_img)
+
+        # Prepare data entry
+        data_entry = {
+            "Medicine Type": self.med_type,
+            "Image Path": med_img_path,
+            "Mask Path": mask_img_path,
+            #TODO Mask_Area, perimeter
+            "Contour Path": contour_img_path,
+            "Chain Code Length": len(chain_code),
+            "Chain Code": str(chain_code),
+            "Width (mm)": measures[0][0] if measures and len(measures) > 0 else None,
+            "Height (mm)": measures[0][1] if measures and len(measures) > 0 else None,
+            **{f"{color}_histogram": hist.tolist() for color, hist in histograms.items()}
+        }
+        self.data.append(data_entry)
+
+    def save_data_to_csv(self, filename='medicines_features.csv'):
+        if self.data:
+            # Convert the data to a DataFrame
+            df = pd.DataFrame(self.data)
+            
+            # Determine a column to sort by. Example: "Width (mm)"
+            # Replace "Width (mm)" with any column in your data you wish to sort
+            if "Width (mm)" in df.columns:
+                df = df.sort_values(by="Width (mm)", ascending=True)
+
+            # Save the sorted DataFrame to a CSV file
+            df.to_csv(filename, index=False)
+            print(f"Data saved to {filename}.")
+        else:
+            print("No data to save.")
+
+
+
+def main():
+    image_path = ".\\frame\\img_4_010_test_2.jpg"
+    stag_id = 4
+    med_type = "Ampoule"
+
+    processor = ExtractFeatures(image_path, stag_id, med_type)
     if processor.detect_stag():
         homogenized = processor.homogenize_image_based_on_corners()
         if homogenized is not None:
@@ -348,16 +408,17 @@ if __name__ == "__main__":
                     plt.imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
                     plt.title('Cropped Scan Area')
                     plt.show()
+
                     filtered_lap = processor.filter_gray_laplacian(cropped)
-                    plt.imshow(cv2.cvtColor(filtered_lap, cmap = 'gray'))
-                    plt.title('Lapacian gray')
+                    plt.imshow(filtered_lap, cmap='gray')
+                    plt.title('Laplacian Filtered')
                     plt.show()
 
                     background_removed = processor.remove_background(filtered_lap)
                     if background_removed is not None:
                         img_med = background_removed.copy()
                         plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
-                        plt.title('Arq.png - Background Removed')
+                        plt.title('Background Removed')
                         plt.show()
 
                         mask = processor.create_mask(background_removed)
@@ -371,32 +432,50 @@ if __name__ == "__main__":
                             plt.title('Largest Contour by Mask')
                             plt.show()
 
-                            chain_code, _ = processor.compute_chain_code(largest_contour)  
+                            chain_code, _ = processor.compute_chain_code(largest_contour)
                             chain_drawn_image, _ = processor.draw_chain_code(img_med, largest_contour, chain_code)
                             plt.imshow(cv2.cvtColor(chain_drawn_image, cv2.COLOR_BGR2RGB))
                             plt.title('Chain Code Drawn')
                             plt.show()
 
                             _, measured_medicine = processor.medicine_measures(img_med, [largest_contour])
-                            plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
-                            plt.title('Measured Medicine')
-                            plt.show()
+                            if measured_medicine is not None:
+                                plt.imshow(cv2.cvtColor(measured_medicine, cv2.COLOR_BGR2RGB))
+                                plt.title('Measured Medicine')
+                                plt.show()
 
-                            # histograms = processor.calculate_histograms(img_med)
-                    
-                            # # Plot dos histogramas RGB
-                            # plt.figure(figsize=(10, 5))
-                            # plt.title('Histograma RGB')
-                            # plt.xlabel('Intensidade do Pixel')
-                            # plt.ylabel('Quantidade de Pixels')
-                            # colors = ['r', 'g', 'b']
-                            # for i, color in enumerate(colors):
-                            #     plt.plot(histograms[color], color=color, label=f'{color.upper()}')
-                            # plt.xlim([0, 256])
-                            # plt.legend()
-                            # plt.grid(True)
-                            # plt.show()
+                                # Calculate histograms
+                                histograms = processor.calculate_histograms(img_med)
+                               # Plot the histograms
+                                if histograms:
+                                    plt.figure(figsize=(10, 5))
+                                    plt.title('RGB Histograms')
+                                    plt.xlabel('Pixel Intensity')
+                                    plt.ylabel('Pixel Count')
+                                    for color in histograms:
+                                        plt.plot(histograms[color], label=color.upper())
+                                    plt.legend()
+                                    plt.grid(True)
+                                    plt.show()
+
+
+                                # Collect data and save to CSV
+                                processor.collect_data(img_med, mask, largest_contour, chain_code, measured_medicine, histograms)
+                                processor.save_data_to_csv("extracted_medicine_features.csv")
+                            else:
+                                print("No valid measures found.")
+                        else:
+                            print("Contours could not be extracted.")
+                    else:
+                        print("Background removal failed.")
+                else:
+                    print("Image cropping failed.")
+            else:
+                print("Marked image creation failed.")
+        else:
+            print("Homogenization failed.")
     else:
         print("Stag detection failed.")
 
-
+if __name__ == "__main__":
+    main()
