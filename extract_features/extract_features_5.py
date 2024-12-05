@@ -6,6 +6,10 @@ from matplotlib import pyplot as plt
 import stag
 from rembg import remove
 import pickle
+from skimage import io, img_as_float
+from skimage.color import rgb2gray
+from skimage.filters import gaussian
+from skimage.segmentation import active_contour
 
 class ExtractFeatures:
     def __init__(self, image_path, stag_id, med_type):
@@ -57,7 +61,7 @@ class ExtractFeatures:
         self.homogenized_image = cv2.warpPerspective(self.image, transform_matrix, (self.image.shape[1], self.image.shape[0]))
         return self.homogenized_image
 
-    def display_scan_area_by_markers(self):
+    def display_scan_area_by_markers(self, med_type):
         """Displays the scan area on the homogenized image based on the stag location."""
         if self.homogenized_image is None:
             print("Homogenized image is not available.")
@@ -66,18 +70,58 @@ class ExtractFeatures:
         centroid_x = int(np.mean(corner[:, 0]))
         centroid_y = int(np.mean(corner[:, 1]))
         cv2.putText(self.homogenized_image, f'ID:{self.stag_id}', (centroid_x + 45, centroid_y -15), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 1)
-        width = np.max(corner[:, 0]) - np.min(corner[:, 0])
-        pixel_size_mm = width / 20
-        crop_width = int(25 * pixel_size_mm)
-        crop_height = int(75 * pixel_size_mm)
-        crop_y_adjustment = int(10 * pixel_size_mm)
-        x_min = max(centroid_x - crop_width, 0)
-        x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
-        y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
-        y_max = max(centroid_y - crop_y_adjustment, 0)
-        cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
-        self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
-        return self.homogenized_image
+        if med_type == "Pill":  
+            width = np.max(corner[:, 0]) - np.min(corner[:, 0])
+            pixel_size_mm = width / 20
+            crop_width = int(30 * pixel_size_mm)
+            crop_height = int(40 * pixel_size_mm)
+            crop_y_adjustment = int(10 * pixel_size_mm)
+            x_min = max(centroid_x - crop_width, 0)
+            x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
+            y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
+            y_max = max(centroid_y - crop_y_adjustment, 0)
+            cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+            self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
+            return self.homogenized_image
+        elif med_type == "Ampoule":  
+            width = np.max(corner[:, 0]) - np.min(corner[:, 0])
+            pixel_size_mm = width / 20
+            crop_width = int(8 * pixel_size_mm)
+            crop_height = int(50 * pixel_size_mm)
+            crop_y_adjustment = int(10 * pixel_size_mm)
+            x_min = max(centroid_x - crop_width, 0)
+            x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
+            y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
+            y_max = max(centroid_y - crop_y_adjustment, 0)
+            cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0, 255, 0), 1)
+            self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
+            return self.homogenized_image
+        elif med_type == "Flask":
+            width = np.max(corner[:, 0]) - np.min(corner[:, 0])
+            pixel_size_mm = width / 20
+            crop_width = int(20* pixel_size_mm)
+            crop_height = int(40 * pixel_size_mm)
+            crop_y_adjustment = int(10 * pixel_size_mm)
+            x_min = max(centroid_x - crop_width, 0)
+            x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
+            y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
+            y_max = max(centroid_y - crop_y_adjustment, 0)
+            cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0,255,0), 1)
+            self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
+            return self.homogenized_image
+        else:
+            width = np.max(corner[:, 0]) - np.min(corner[:, 0])
+            pixel_size_mm = width /20
+            crop_width = int(30*pixel_size_mm)
+            crop_height = int(75*pixel_size_mm)
+            crop_y_adjustment = int(10 * pixel_size_mm)
+            x_min = max(centroid_x - crop_width, 0)
+            x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
+            y_min = max(centroid_y - crop_height - crop_y_adjustment, 0)
+            y_max = max(centroid_y - crop_y_adjustment, 0)
+            cv2.rectangle(self.homogenized_image, (x_min, y_min), (x_max, y_max), (0,255,0),1)
+            self.scan_areas[self.stag_id] = (x_min, x_max, y_min, y_max)
+            return self.homogenized_image
 
     def crop_scan_area(self):
         """Crops the defined scan area from the homogenized image for further processing."""
@@ -86,35 +130,47 @@ class ExtractFeatures:
             return None
         x_min, x_max, y_min, y_max = self.scan_areas[self.stag_id]
         cropped_image = self.homogenized_image[y_min:y_max, x_min:x_max]
+        # Save
+        directory_path = 'features/cropped_imgs'
+        if not os.path.exists(directory_path):
+            os.makedirs(directory_path)    
+        file_number = 0
+        while os.path.exists(f'{directory_path}/img_cropped_{file_number}.png'):
+            file_number += 1
+        file_path = f'{directory_path}/img_cropped_{file_number}.png'
+        cv2.imwrite(file_path, cropped_image)
+        print(f'Image saved as {file_path}')
         return cropped_image
 
-    def filter_gray_laplacian(self, image):
-        """Applies a Laplacian filter to the cropped image to enhance edges."""
+    def filter_pdi(self, image):
+        """Applies Gaussian blur followed by a Sobel filter to enhance horizontal edges of a reflective object."""
         img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        kernel = np.array([
-            #  [-1, 0, 1],
-            #  [-2, 0, 2],
-            #  [-1, 0, 1]
-            [-2, 1, -2],
-            [1, 4, 1],
-            [-2, 1, -2]
+        # img_blur = cv2.GaussianBlur(img_gray, (1, 1), 0)
+        filter = np.array([
+            [ 0, -1, 0],
+            [-1, 4, -1],
+            [ 0, -1, 0]
         ])
         ddepth = cv2.CV_16S
-        img_filtered = cv2.filter2D(img_gray, ddepth, kernel)
+        img_filtered = cv2.filter2D(img_gray, ddepth, filter)
         abs_img_filtered = cv2.convertScaleAbs(img_filtered)
         return abs_img_filtered
-    
-    def otsu_thresholding(self, image):
-        # Converter a imagem para escala de cinza, se ainda não estiver
-        if len(image.shape) == 3:
-            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray_image = image
-        
-        # Aplicar a binarização de Otsu
-        _, binary_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        return binary_image
+
+    def apply_blend_filter(self, image):
+        """Transforms image to grayscale, applies Sobel filter, and overlays it on the original image."""
+        img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # img_blur = cv2.GaussianBlur(img_gray, (1, 1), 0)
+        filter = np.array([
+            [ 0, -1, 0],
+            [-1, 4, -1],
+            [ 0, -1, 0]
+        ])
+        ddepth = cv2.CV_16S
+        img_filtered = cv2.filter2D(img_gray, ddepth, filter)
+        abs_img_filtered = cv2.convertScaleAbs(img_filtered)
+        alpha = 0.8 
+        blended = cv2.addWeighted(image, 1, cv2.cvtColor(abs_img_filtered, cv2.COLOR_GRAY2BGR), alpha, 0)
+        return blended
 
     def remove_background(self, image_np_array):
         """Removes the background from the image using the rembg library."""
@@ -130,7 +186,7 @@ class ExtractFeatures:
     def calculate_histograms(self, img_med):
         """Calculates and returns RGB histograms for the processed image."""
         histograms = {}
-        if img_med.shape[2] == 4:  # If alpha channel exists
+        if img_med.shape[2] == 4:  
             alpha_mask = img_med[:, :, 3] > 10
             img_bgr = img_med[alpha_mask, :3]
         else:
@@ -142,16 +198,39 @@ class ExtractFeatures:
             histograms[color] = hist.flatten()
         return histograms
 
+
     def create_mask(self, img):
-        """Creates a binary mask for the foreground object in the image for segmentation."""
+        """Creates a binary mask for the foreground object in the image for segmentation,
+        including certain RGB ranges and excluding certain HSV ranges."""
+        
+        # Se a imagem tiver um canal alfa, remova-o
         if img.shape[2] == 4:
-            img = img[:, :, :3]  # Remove alpha channel
-        lower_bound = np.array([30, 30, 30])
-        upper_bound = np.array([256, 256, 256])
-        mask = cv2.inRange(img, lower_bound, upper_bound)
-        mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
-        mask_rgba[:, :, 3] = mask
-        return mask
+            img = img[:, :, :3]
+        # Definir os limites para a máscara RGB (incluindo)
+        lower_bound_rgb = np.array([30, 30, 30])
+        upper_bound_rgb = np.array([255, 255, 255])
+        
+        # Criar máscara RGB
+        mask_rgb = cv2.inRange(img, lower_bound_rgb, upper_bound_rgb)
+        
+        # Converter a imagem para o espaço de cor HSV para processamento de exclusão
+        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        
+        # Definir os limites para a máscara HSV (excluindo)
+        lower_bound_hsv = np.array([0, 4, 94])
+        upper_bound_hsv = np.array([43, 255, 255])
+      
+        # Criar máscara HSV
+        mask_hsv = cv2.inRange(img_hsv, lower_bound_hsv, upper_bound_hsv)
+        
+        # Inverter a máscara HSV para obter a área que não está nos thresholds de exclusão
+        mask_hsv_inverted = cv2.bitwise_not(mask_hsv)
+        
+        # Combinar as máscaras para incluir RGB e excluir áreas HSV
+        final_mask = cv2.bitwise_and(mask_rgb, mask_hsv_inverted)
+        
+        return final_mask
+
 
     def find_and_draw_contours(self, mask):
         """Finds and draws the largest contour around the foreground object."""
@@ -288,9 +367,9 @@ class ExtractFeatures:
 
 def main():
     """Main function to execute the process and display results of each step."""
-    image_path = ".\\frames\\thiago_fotos_10_features_morning\\img_2_010.jpg"
-    stag_id = 2
-    med_type = "Pill"
+    image_path = ".\\frames\\matte black box\\img_0_004.jpg"
+    stag_id = 0
+    med_type = "Ampoule"
     processor = ExtractFeatures(image_path, stag_id, med_type)
     
     if processor.detect_stag():
@@ -300,7 +379,7 @@ def main():
             plt.title('Homogenized Image')
             plt.show()
 
-            marked_image = processor.display_scan_area_by_markers()
+            marked_image = processor.display_scan_area_by_markers(med_type)
             if marked_image is not None:
                 plt.imshow(cv2.cvtColor(marked_image, cv2.COLOR_BGR2RGB))
                 plt.title('Marked Scan Area')
@@ -312,19 +391,29 @@ def main():
                     plt.title('Cropped Scan Area')
                     plt.show()
 
-                    filtered_lap = processor.filter_gray_laplacian(cropped)
-                    if filtered_lap is not None:
-                        plt.imshow(filtered_lap, cmap='gray')
-                        plt.title('Laplacian Filtered')
+                    filtered_pdi = processor.filter_pdi(cropped)
+                    if filtered_pdi is not None:
+                        plt.imshow(filtered_pdi, cmap='gray')
+                        plt.title('Experimental Filter')
                         plt.show()
 
-                        binary_image = processor.otsu_thresholding(filtered_lap)
-                        if binary_image is not None:
-                            plt.imshow(binary_image, cmap='gray')
-                            plt.title('Otsu Binarized Image')
+                        # detect_curv = processor.detect_curvature(cropped)
+                        # plt.imshow(detect_curv)
+                        # plt.title('Detect Curve')
+                        # plt.show()
+
+                        # snake_cont = processor.snake_contour(cropped)
+                        # plt.imshow(snake_cont, cmap='gray')
+                        # plt.title('Snake')
+                        # plt.show()
+
+                        blend_filt = processor.apply_blend_filter(cropped)
+                        if blend_filt is not None:    
+                            plt.imshow(blend_filt, cmap='gray')
+                            plt.title('Blend')
                             plt.show()
-  
-                            background_removed = processor.remove_background(filtered_lap)
+
+                            background_removed = processor.remove_background(blend_filt)
                             if background_removed is not None:
                                 img_med = background_removed.copy()
                                 plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))

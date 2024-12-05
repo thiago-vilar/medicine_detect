@@ -70,7 +70,7 @@ def main():
         print("Erro: Não foi possível abrir a imagem. Verifique se o caminho está correto.")
         return
 
-    image = cv2.resize(image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
+    image = cv2.resize(image, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
     original_image = image.copy()
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     min_hue, min_sat, min_val = np.min(hsv_image, axis=(0, 1))
