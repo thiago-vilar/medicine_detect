@@ -86,8 +86,8 @@ class ExtractFeatures:
         elif med_type == "Ampoule":  
             width = np.max(corner[:, 0]) - np.min(corner[:, 0])
             pixel_size_mm = width / 20
-            crop_width = int(8 * pixel_size_mm)
-            crop_height = int(50 * pixel_size_mm)
+            crop_width = int(10 * pixel_size_mm)
+            crop_height = int(70 * pixel_size_mm)
             crop_y_adjustment = int(10 * pixel_size_mm)
             x_min = max(centroid_x - crop_width, 0)
             x_max = min(centroid_x + crop_width, self.homogenized_image.shape[1])
@@ -145,30 +145,30 @@ class ExtractFeatures:
     def filter_pdi(self, image):
         """Applies Gaussian blur followed by a Sobel filter to enhance horizontal edges of a reflective object."""
         img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # img_blur = cv2.GaussianBlur(img_gray, (1, 1), 0)
+        img_blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
         filter = np.array([
-            [ 0, -1, 0],
-            [-1, 4, -1],
-            [ 0, -1, 0]
+            [0,  1, 0],
+            [1, -4, 1],
+            [0,  1, 0]
         ])
         ddepth = cv2.CV_16S
-        img_filtered = cv2.filter2D(img_gray, ddepth, filter)
+        img_filtered = cv2.filter2D(img_blur, ddepth, filter)
         abs_img_filtered = cv2.convertScaleAbs(img_filtered)
         return abs_img_filtered
 
     def apply_blend_filter(self, image):
         """Transforms image to grayscale, applies Sobel filter, and overlays it on the original image."""
         img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # img_blur = cv2.GaussianBlur(img_gray, (1, 1), 0)
+        img_blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
         filter = np.array([
-            [ 0, -1, 0],
-            [-1, 4, -1],
-            [ 0, -1, 0]
+            [0,  1, 0],
+            [1, -4, 1],
+            [0,  1, 0]
         ])
         ddepth = cv2.CV_16S
-        img_filtered = cv2.filter2D(img_gray, ddepth, filter)
+        img_filtered = cv2.filter2D(img_blur, ddepth, filter)
         abs_img_filtered = cv2.convertScaleAbs(img_filtered)
-        alpha = 0.8 
+        alpha = 0.7 
         blended = cv2.addWeighted(image, 1, cv2.cvtColor(abs_img_filtered, cv2.COLOR_GRAY2BGR), alpha, 0)
         return blended
 
@@ -200,36 +200,29 @@ class ExtractFeatures:
 
 
     def create_mask(self, img):
-        """Creates a binary mask for the foreground object in the image for segmentation,
-        including certain RGB ranges and excluding certain HSV ranges."""
-        
-        # Se a imagem tiver um canal alfa, remova-o
+        """Creates a binary mask for the foreground object in the image and saves it with transparency."""
         if img.shape[2] == 4:
-            img = img[:, :, :3]
-        # Definir os limites para a máscara RGB (incluindo)
-        lower_bound_rgb = np.array([30, 30, 30])
-        upper_bound_rgb = np.array([255, 255, 255])
-        
-        # Criar máscara RGB
-        mask_rgb = cv2.inRange(img, lower_bound_rgb, upper_bound_rgb)
-        
-        # Converter a imagem para o espaço de cor HSV para processamento de exclusão
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        
-        # Definir os limites para a máscara HSV (excluindo)
-        lower_bound_hsv = np.array([0, 4, 94])
-        upper_bound_hsv = np.array([43, 255, 255])
-      
-        # Criar máscara HSV
-        mask_hsv = cv2.inRange(img_hsv, lower_bound_hsv, upper_bound_hsv)
-        
-        # Inverter a máscara HSV para obter a área que não está nos thresholds de exclusão
-        mask_hsv_inverted = cv2.bitwise_not(mask_hsv)
-        
-        # Combinar as máscaras para incluir RGB e excluir áreas HSV
-        final_mask = cv2.bitwise_and(mask_rgb, mask_hsv_inverted)
-        
-        return final_mask
+            img = img[:, :, :3]  # Remove alpha channel
+        lower_bound = np.array([30, 30, 30])
+        upper_bound = np.array([256, 256, 256])
+        mask = cv2.inRange(img, lower_bound, upper_bound)
+        # Convert binary mask to 4-channel 
+        mask_rgba = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGBA)
+        mask_rgba[:, :, 3] = mask 
+
+        # # Save the mask as a .pkl file
+        # directory = 'features/mask'
+        # if not os.path.exists(directory):
+        #     os.makedirs(directory)
+        # file_number = 0
+        # while os.path.exists(f'{directory}/mask_{file_number}.pkl'):
+        #     file_number += 1
+        # file_path = f'{directory}/mask_{file_number}.pkl'
+        # with open(file_path, 'wb') as file:
+        #     pickle.dump(mask, file)
+        # print(f'Mask saved as {file_path} with transparency in {directory}')
+
+        return mask
 
 
     def find_and_draw_contours(self, mask):
@@ -367,8 +360,8 @@ class ExtractFeatures:
 
 def main():
     """Main function to execute the process and display results of each step."""
-    image_path = ".\\frames\\matte black box\\img_0_004.jpg"
-    stag_id = 0
+    image_path = ".\\frames\\thiago_fotos_10_features_morning\\img_1_010.jpg"
+    stag_id = 1
     med_type = "Ampoule"
     processor = ExtractFeatures(image_path, stag_id, med_type)
     
@@ -397,23 +390,13 @@ def main():
                         plt.title('Experimental Filter')
                         plt.show()
 
-                        # detect_curv = processor.detect_curvature(cropped)
-                        # plt.imshow(detect_curv)
-                        # plt.title('Detect Curve')
-                        # plt.show()
-
-                        # snake_cont = processor.snake_contour(cropped)
-                        # plt.imshow(snake_cont, cmap='gray')
-                        # plt.title('Snake')
-                        # plt.show()
-
                         blend_filt = processor.apply_blend_filter(cropped)
                         if blend_filt is not None:    
                             plt.imshow(blend_filt, cmap='gray')
                             plt.title('Blend')
                             plt.show()
 
-                            background_removed = processor.remove_background(blend_filt)
+                            background_removed = processor.remove_background(cropped)
                             if background_removed is not None:
                                 img_med = background_removed.copy()
                                 plt.imshow(cv2.cvtColor(img_med, cv2.COLOR_BGR2RGB))
